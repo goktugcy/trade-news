@@ -72,3 +72,11 @@ export type PaginatedNews = {
 };
 
 export type SelectOption = { value: string | number; label: string; [key: string]: unknown };
+
+export type TickerItem = {
+    symbol: string;
+    market: Market;
+    price: number | null;
+    currency: string;
+    change_percent: number | null;
+};

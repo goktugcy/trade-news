@@ -14,6 +14,7 @@ import {
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
+import NavThemeToggle from '@/components/NavThemeToggle.vue';
 import NavUser from '@/components/NavUser.vue';
 import {
     Sidebar,
@@ -67,6 +68,7 @@ const adminNavItems: NavItem[] = [{ title: 'Admin', href: '/admin', icon: Shield
         </SidebarContent>
 
         <SidebarFooter>
+            <NavThemeToggle />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

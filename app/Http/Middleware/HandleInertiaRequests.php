@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\MarketData\MarketSummaryService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,6 +42,10 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            // Scrolling top-bar ticker — cached, so cheap to share on every request.
+            'ticker' => fn () => $request->user()
+                ? app(MarketSummaryService::class)->ticker()
+                : [],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }
