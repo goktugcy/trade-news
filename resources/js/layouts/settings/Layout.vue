@@ -20,6 +20,10 @@ const sidebarNavItems: NavItem[] = [
         href: editSecurity(),
     },
     {
+        title: 'Telegram',
+        href: '/settings/telegram',
+    },
+    {
         title: 'Appearance',
         href: editAppearance(),
     },

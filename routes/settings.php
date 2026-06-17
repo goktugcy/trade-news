@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
+use App\Http\Controllers\Settings\TelegramController;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +25,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
+
+    // Telegram integration settings.
+    Route::get('settings/telegram', [TelegramController::class, 'show'])->name('telegram.show');
+    Route::post('settings/telegram/code', [TelegramController::class, 'generateCode'])->name('telegram.code');
+    Route::post('settings/telegram/toggle', [TelegramController::class, 'toggle'])->name('telegram.toggle');
+    Route::delete('settings/telegram', [TelegramController::class, 'disconnect'])->name('telegram.disconnect');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {
