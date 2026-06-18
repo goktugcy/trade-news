@@ -7,6 +7,7 @@ namespace Database\Factories;
 use App\Enums\Timeframe;
 use App\Models\Stock;
 use App\Models\StockPrice;
+use App\Services\Providers\ApiProviderRegistry;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -26,6 +27,8 @@ class StockPriceFactory extends Factory
         return [
             'stock_id' => Stock::factory(),
             'timeframe' => Timeframe::FiveMinutes,
+            'provider_key' => 'finnhub',
+            'source_kind' => StockPrice::SOURCE_CANDLE,
             'open' => round($open, 4),
             'high' => round($high, 4),
             'low' => round($low, 4),
@@ -38,5 +41,21 @@ class StockPriceFactory extends Factory
     public function timeframe(Timeframe $tf): static
     {
         return $this->state(fn () => ['timeframe' => $tf]);
+    }
+
+    public function synthetic(): static
+    {
+        return $this->state(fn () => [
+            'provider_key' => ApiProviderRegistry::SYNTHETIC_MARKET_KEY,
+            'source_kind' => StockPrice::SOURCE_SYNTHETIC,
+        ]);
+    }
+
+    public function legacy(): static
+    {
+        return $this->state(fn () => [
+            'provider_key' => null,
+            'source_kind' => StockPrice::SOURCE_CANDLE,
+        ]);
     }
 }

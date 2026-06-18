@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\MarketData;
 
+use App\Enums\ProviderType;
 use App\Models\Stock;
+use App\Services\Providers\ApiProviderRegistry;
 use App\Support\Presenters\StockPresenter;
 use Illuminate\Support\Facades\Cache;
 
@@ -19,8 +21,8 @@ class MarketSummaryService
      */
     public function topMovers(int $limit = 5): array
     {
-        return Cache::remember('tn:top-movers', config('tradenews.cache.market_summary_ttl', 60), function () use ($limit): array {
-            $sorted = $this->rankedRows();
+        return Cache::remember($this->cacheKey('top-movers'), config('tradenews.cache.market_summary_ttl', 60), function () use ($limit): array {
+            $sorted = collect($this->rankedRows());
 
             return [
                 'gainers' => $sorted->take($limit)->all(),
@@ -36,8 +38,8 @@ class MarketSummaryService
      */
     public function ticker(int $perSide = 8): array
     {
-        return Cache::remember('tn:ticker', config('tradenews.cache.market_summary_ttl', 60), function () use ($perSide): array {
-            $sorted = $this->rankedRows();
+        return Cache::remember($this->cacheKey('ticker'), config('tradenews.cache.market_summary_ttl', 60), function () use ($perSide): array {
+            $sorted = collect($this->rankedRows());
 
             $gainers = $sorted->take($perSide);
             $losers = $sorted->reverse()->take($perSide);
@@ -59,9 +61,9 @@ class MarketSummaryService
     /**
      * Active stocks with a known quote, ranked by % change (gainers first).
      *
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
-    private function rankedRows(): \Illuminate\Support\Collection
+    private function rankedRows(): array
     {
         return Stock::query()
             ->active()
@@ -70,6 +72,16 @@ class MarketSummaryService
             ->map(fn (Stock $stock) => StockPresenter::row($stock))
             ->filter(fn ($row) => $row['change_percent'] !== null)
             ->sortByDesc('change_percent')
-            ->values();
+            ->values()
+            ->all();
+    }
+
+    private function cacheKey(string $name): string
+    {
+        $mode = app(ApiProviderRegistry::class)->hasActiveRealProvider(ProviderType::MarketData)
+            ? 'api'
+            : 'development';
+
+        return "tn:{$name}:{$mode}";
     }
 }

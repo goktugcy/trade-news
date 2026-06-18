@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $name
  * @property string|null $provider
  * @property string|null $market
+ * @property string|null $feed_url
+ * @property string|null $homepage_url
  * @property bool $is_active
  */
 class NewsSource extends Model
@@ -23,7 +25,7 @@ class NewsSource extends Model
     use HasFactory;
 
     protected $fillable = [
-        'key', 'name', 'provider', 'market', 'homepage_url', 'is_active',
+        'key', 'name', 'provider', 'market', 'feed_url', 'homepage_url', 'is_active',
     ];
 
     protected function casts(): array

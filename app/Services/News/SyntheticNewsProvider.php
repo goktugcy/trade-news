@@ -33,7 +33,7 @@ class SyntheticNewsProvider implements NewsProviderInterface
 
     public function key(): string
     {
-        return 'synthetic';
+        return 'synthetic-news';
     }
 
     public function fetchLatest(?Market $market = null, int $limit = 50): array

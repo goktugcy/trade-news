@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\UserDataPreference;
 use App\Services\MarketData\MarketSummaryService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -42,10 +43,23 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'dataPreferences' => function () use ($request): array {
+                $preference = $request->user()?->dataPreference;
+
+                return [
+                    'auto_refresh_seconds' => $preference instanceof UserDataPreference
+                        ? $preference->auto_refresh_seconds
+                        : UserDataPreference::DEFAULT_AUTO_REFRESH_SECONDS,
+                ];
+            },
             // Scrolling top-bar ticker — cached, so cheap to share on every request.
             'ticker' => fn () => $request->user()
                 ? app(MarketSummaryService::class)->ticker()
                 : [],
+            // Header bell: unread count for the in-app notification inbox.
+            'notifications' => fn () => [
+                'unread_count' => $request->user()?->userNotifications()->unread()->count() ?? 0,
+            ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

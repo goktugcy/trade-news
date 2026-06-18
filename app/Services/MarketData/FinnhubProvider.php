@@ -10,8 +10,12 @@ use App\Enums\Market;
 use App\Enums\Timeframe;
 use App\Models\Stock;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Real market-data integration against the Finnhub REST API.
@@ -26,6 +30,7 @@ class FinnhubProvider implements MarketDataProviderInterface
     public function __construct(
         private readonly string $apiKey,
         private readonly string $baseUrl = 'https://finnhub.io/api/v1',
+        private readonly bool $candlesEnabled = false,
     ) {}
 
     public function key(): string
@@ -35,16 +40,26 @@ class FinnhubProvider implements MarketDataProviderInterface
 
     public function getQuote(Stock $stock): ?QuoteData
     {
-        $response = Http::baseUrl($this->baseUrl)
-            ->timeout(8)
-            ->retry(2, 200)
-            ->get('/quote', [
+        try {
+            $response = $this->client(8)->get('/quote', [
                 'symbol' => $this->vendorSymbol($stock),
                 'token' => $this->apiKey,
             ]);
+        } catch (ConnectionException $exception) {
+            Log::warning('Finnhub quote connection failed', [
+                'symbol' => $stock->symbol,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
 
         if ($response->failed()) {
-            Log::warning('Finnhub quote failed', ['symbol' => $stock->symbol, 'status' => $response->status()]);
+            Log::warning('Finnhub quote failed', [
+                'symbol' => $stock->symbol,
+                'status' => $response->status(),
+                'body' => str($response->body())->limit(160)->toString(),
+            ]);
 
             return null;
         }
@@ -69,20 +84,42 @@ class FinnhubProvider implements MarketDataProviderInterface
 
     public function getCandles(Stock $stock, Timeframe $timeframe, int $limit = 120): array
     {
+        if (! $this->candlesEnabled) {
+            return [];
+        }
+
         $resolution = $this->resolution($timeframe);
         $to = CarbonImmutable::now();
         $from = $to->subSeconds($timeframe->seconds() * $limit);
 
-        $response = Http::baseUrl($this->baseUrl)
-            ->timeout(10)
-            ->retry(2, 200)
-            ->get('/stock/candle', [
+        try {
+            $response = $this->client(10)->get('/stock/candle', [
                 'symbol' => $this->vendorSymbol($stock),
                 'resolution' => $resolution,
                 'from' => $from->getTimestamp(),
                 'to' => $to->getTimestamp(),
                 'token' => $this->apiKey,
             ]);
+        } catch (ConnectionException $exception) {
+            Log::warning('Finnhub candle connection failed', [
+                'symbol' => $stock->symbol,
+                'timeframe' => $timeframe->value,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return [];
+        }
+
+        if ($response->failed()) {
+            Log::warning('Finnhub candle failed', [
+                'symbol' => $stock->symbol,
+                'timeframe' => $timeframe->value,
+                'status' => $response->status(),
+                'body' => str($response->body())->limit(160)->toString(),
+            ]);
+
+            return [];
+        }
 
         $data = $response->json();
 
@@ -127,5 +164,23 @@ class FinnhubProvider implements MarketDataProviderInterface
             Timeframe::OneHour => '60',
             Timeframe::OneDay => 'D',
         };
+    }
+
+    private function client(int $timeout): PendingRequest
+    {
+        return Http::baseUrl($this->baseUrl)
+            ->connectTimeout(3)
+            ->timeout($timeout)
+            ->retry(
+                [200, 500],
+                when: fn (Throwable $exception): bool => $this->shouldRetry($exception),
+                throw: false,
+            );
+    }
+
+    private function shouldRetry(Throwable $exception): bool
+    {
+        return $exception instanceof ConnectionException
+            || ($exception instanceof RequestException && $exception->response->serverError());
     }
 }

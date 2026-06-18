@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\News;
 
+use App\Enums\Market;
 use App\Models\NewsItem;
 use App\Models\Stock;
 use Illuminate\Support\Collection;
@@ -35,7 +36,7 @@ class NewsMatcherService
     /**
      * Cached term index: list of [stockId, type, term] tuples.
      *
-     * @var array<int, array{0: int, 1: string, 2: string}>|null
+     * @var array<int, array{0: int, 1: string, 2: string, 3: string}>|null
      */
     private ?array $index = null;
 
@@ -61,7 +62,7 @@ class NewsMatcherService
         // Best match per stock (keep the highest-confidence reason).
         $matches = [];
 
-        foreach ($this->termIndex() as [$stockId, $type, $term]) {
+        foreach ($this->termIndex() as [$stockId, $type, $term, $market]) {
             $needle = mb_strtolower($term);
 
             if (! $this->contains($haystack, $needle, $type)) {
@@ -75,6 +76,7 @@ class NewsMatcherService
                     'match_type' => $type,
                     'matched_term' => $term,
                     'confidence' => $confidence,
+                    'market' => $market,
                 ];
             }
         }
@@ -82,11 +84,23 @@ class NewsMatcherService
         foreach ($matches as $stockId => $data) {
             $item->matches()->updateOrCreate(
                 ['stock_id' => $stockId],
-                $data + ['created_at' => now()],
+                [
+                    'match_type' => $data['match_type'],
+                    'matched_term' => $data['matched_term'],
+                    'confidence' => $data['confidence'],
+                    'created_at' => now(),
+                ],
             );
         }
 
-        $item->forceFill(['is_matched' => true])->save();
+        $updates = ['is_matched' => true];
+        $market = $this->marketFromMatches($matches);
+
+        if ($market !== null) {
+            $updates['market'] = $market;
+        }
+
+        $item->forceFill($updates)->save();
 
         return count($matches);
     }
@@ -110,7 +124,7 @@ class NewsMatcherService
     /**
      * Build (and memoize) the flat term → stock index from all active stocks.
      *
-     * @return array<int, array{0: int, 1: string, 2: string}>
+     * @return array<int, array{0: int, 1: string, 2: string, 3: string}>
      */
     private function termIndex(): array
     {
@@ -121,23 +135,42 @@ class NewsMatcherService
         $this->index = [];
 
         Stock::query()->active()->get()->each(function (Stock $stock): void {
-            $this->index[] = [$stock->id, self::TYPE_SYMBOL, $stock->symbol];
-            $this->index[] = [$stock->id, self::TYPE_NAME, $stock->name];
+            $market = $stock->market->value;
+            $this->index[] = [$stock->id, self::TYPE_SYMBOL, $stock->symbol, $market];
+            $this->index[] = [$stock->id, self::TYPE_NAME, $stock->name, $market];
 
             foreach (($stock->aliases ?? []) as $alias) {
                 if (trim($alias) !== '' && $alias !== $stock->symbol && $alias !== $stock->name) {
-                    $this->index[] = [$stock->id, self::TYPE_ALIAS, $alias];
+                    $this->index[] = [$stock->id, self::TYPE_ALIAS, $alias, $market];
                 }
             }
 
             foreach (($stock->keywords ?? []) as $keyword) {
                 if (trim($keyword) !== '') {
-                    $this->index[] = [$stock->id, self::TYPE_KEYWORD, $keyword];
+                    $this->index[] = [$stock->id, self::TYPE_KEYWORD, $keyword, $market];
                 }
             }
         });
 
         return $this->index;
+    }
+
+    /**
+     * @param  array<int, array{match_type: string, matched_term: string, confidence: float, market: string}>  $matches
+     */
+    private function marketFromMatches(array $matches): ?Market
+    {
+        $markets = collect($matches)
+            ->pluck('market')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($markets->count() !== 1) {
+            return null;
+        }
+
+        return Market::tryFrom((string) $markets->first());
     }
 
     /**

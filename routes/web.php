@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NewsController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationRuleController;
+use App\Http\Controllers\StockAlertController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\WatchlistController;
 use App\Http\Controllers\Webhooks\TelegramWebhookController;
@@ -41,6 +43,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('watchlist', [WatchlistController::class, 'store'])->name('watchlist.store');
     Route::patch('watchlist/{watchlist}/alert', [WatchlistController::class, 'toggleAlert'])->name('watchlist.alert');
     Route::delete('watchlist/{watchlist}', [WatchlistController::class, 'destroy'])->name('watchlist.destroy');
+
+    // In-app notification inbox
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('notifications/unread', [NotificationController::class, 'unread'])->name('notifications.unread');
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::patch('notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::delete('notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+
+    // Custom stock alerts (price/volume/news conditions)
+    Route::post('alerts/stock', [StockAlertController::class, 'store'])->name('stock-alerts.store');
+    Route::put('alerts/stock/{stockAlert}', [StockAlertController::class, 'update'])->name('stock-alerts.update');
+    Route::delete('alerts/stock/{stockAlert}', [StockAlertController::class, 'destroy'])->name('stock-alerts.destroy');
 
     // Notification rules (alerts)
     Route::get('alerts', [NotificationRuleController::class, 'index'])->name('alerts.index');

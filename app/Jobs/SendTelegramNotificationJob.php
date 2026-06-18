@@ -48,8 +48,8 @@ class SendTelegramNotificationJob implements ShouldQueue
         }
 
         $body = $notification->newsItem
-            ? $telegram->formatNewsAlert($notification->newsItem)
-            : $notification->title;
+            ? $telegram->formatNewsAlert($notification->newsItem, $notification->user->timezone)
+            : ($notification->body ?: $notification->title);
 
         $sent = $telegram->sendMessage($integration->chat_id, $body);
 

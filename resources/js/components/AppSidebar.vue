@@ -2,6 +2,7 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     Bell,
+    Inbox,
     LayoutGrid,
     ListChecks,
     Newspaper,
@@ -37,6 +38,7 @@ const mainNavItems: NavItem[] = [
     { title: 'Stocks', href: '/stocks', icon: TrendingUp },
     { title: 'Watchlist', href: '/watchlist', icon: ListChecks },
     { title: 'Alerts', href: '/alerts', icon: Bell },
+    { title: 'Notifications', href: '/notifications', icon: Inbox },
 ];
 
 const settingsNavItems: NavItem[] = [

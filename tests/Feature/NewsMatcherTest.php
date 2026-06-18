@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Market;
+use App\Jobs\MatchNewsWithStocksJob;
 use App\Models\NewsItem;
 use App\Models\Stock;
 use App\Services\News\NewsMatcherService;
@@ -77,4 +78,98 @@ it('records the match type and is idempotent', function () {
 
     expect($news->matches()->count())->toBe(1)
         ->and($news->matches()->first()->match_type)->toBe('symbol');
+});
+
+it('moves a BIST-labelled item to NASDAQ when only NASDAQ stocks match', function () {
+    Stock::factory()->nasdaq()->create([
+        'symbol' => 'AAPL',
+        'name' => 'Apple Inc.',
+        'aliases' => ['Apple', 'AAPL'],
+    ]);
+
+    $news = NewsItem::factory()->create([
+        'title' => 'Apple shares rise after new iPhone demand report',
+        'summary' => null,
+        'content' => null,
+        'market' => Market::BIST,
+        'is_matched' => false,
+    ]);
+
+    (new NewsMatcherService)->match($news);
+
+    expect($news->fresh()->market)->toBe(Market::NASDAQ);
+});
+
+it('keeps a BIST item as BIST when only BIST stocks match', function () {
+    $news = NewsItem::factory()->create([
+        'title' => 'Turkish Airlines reports record passenger numbers',
+        'summary' => null,
+        'content' => null,
+        'market' => Market::BIST,
+        'is_matched' => false,
+    ]);
+
+    (new NewsMatcherService)->match($news);
+
+    expect($news->fresh()->market)->toBe(Market::BIST);
+});
+
+it('keeps the source market when matched stocks span multiple markets', function () {
+    Stock::factory()->nasdaq()->create([
+        'symbol' => 'AAPL',
+        'name' => 'Apple Inc.',
+        'aliases' => ['Apple', 'AAPL'],
+    ]);
+
+    $news = NewsItem::factory()->create([
+        'title' => 'Apple and Turkish Airlines announce a new travel technology partnership',
+        'summary' => null,
+        'content' => null,
+        'market' => Market::BIST,
+        'is_matched' => false,
+    ]);
+
+    (new NewsMatcherService)->match($news);
+
+    expect($news->fresh()->market)->toBe(Market::BIST);
+});
+
+it('can repair market labels for already matched news items', function () {
+    Stock::factory()->nasdaq()->create([
+        'symbol' => 'NVDA',
+        'name' => 'Nvidia Corporation',
+        'aliases' => ['Nvidia', 'NVDA'],
+    ]);
+
+    $news = NewsItem::factory()->create([
+        'title' => 'Nvidia expands AI chip production',
+        'summary' => null,
+        'content' => null,
+        'market' => Market::BIST,
+        'is_matched' => true,
+    ]);
+
+    (new MatchNewsWithStocksJob(repairMarkets: true))->handle(new NewsMatcherService);
+
+    expect($news->fresh()->market)->toBe(Market::NASDAQ);
+});
+
+it('can repair market labels synchronously from the match command', function () {
+    Stock::factory()->nasdaq()->create([
+        'symbol' => 'MSFT',
+        'name' => 'Microsoft Corporation',
+        'aliases' => ['Microsoft', 'MSFT'],
+    ]);
+
+    $news = NewsItem::factory()->create([
+        'title' => 'Microsoft announces new cloud infrastructure investment',
+        'summary' => null,
+        'content' => null,
+        'market' => Market::BIST,
+        'is_matched' => true,
+    ]);
+
+    $this->artisan('tradenews:match-news --repair-markets --sync')->assertSuccessful();
+
+    expect($news->fresh()->market)->toBe(Market::NASDAQ);
 });

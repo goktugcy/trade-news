@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\DataPreferenceController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Controllers\Settings\TelegramController;
@@ -25,6 +26,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
+
+    Route::get('settings/data', [DataPreferenceController::class, 'edit'])->name('data-preferences.edit');
+    Route::put('settings/data', [DataPreferenceController::class, 'update'])->name('data-preferences.update');
 
     // Telegram integration settings.
     Route::get('settings/telegram', [TelegramController::class, 'show'])->name('telegram.show');

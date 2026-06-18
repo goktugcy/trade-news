@@ -57,7 +57,7 @@ function toggleAdmin(id: number) {
 <template>
     <Head title="Admin · Users" />
 
-    <div class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4">
+    <div class="mx-auto flex w-full flex-1 flex-col gap-4 p-4">
         <AdminNav />
 
         <div class="flex flex-wrap items-center gap-3">

@@ -7,6 +7,7 @@ namespace Database\Seeders;
 use App\Enums\ProviderStatus;
 use App\Enums\ProviderType;
 use App\Models\ApiProvider;
+use App\Models\NewsSource;
 use Illuminate\Database\Seeder;
 
 class ApiProviderSeeder extends Seeder
@@ -15,24 +16,79 @@ class ApiProviderSeeder extends Seeder
     {
         $providers = [
             ['key' => 'synthetic', 'name' => 'Synthetic Generator', 'type' => ProviderType::MarketData,
-                'base_url' => null, 'priority' => 10, 'status' => ProviderStatus::Operational],
+                'base_url' => null, 'priority' => 10, 'status' => ProviderStatus::Operational, 'refresh_interval_minutes' => 5, 'fetch_limit' => 50,
+                'markets' => null, 'capabilities' => ['quotes', 'candles'], 'auto_sync_stocks' => false],
             ['key' => 'finnhub', 'name' => 'Finnhub', 'type' => ProviderType::MarketData,
-                'base_url' => 'https://finnhub.io/api/v1', 'priority' => 20, 'status' => ProviderStatus::Unknown],
+                'base_url' => 'https://finnhub.io/api/v1', 'priority' => 20, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 5, 'fetch_limit' => 50,
+                'markets' => ['NASDAQ'], 'capabilities' => ['quotes', 'candles'], 'auto_sync_stocks' => false],
             ['key' => 'twelvedata', 'name' => 'Twelve Data', 'type' => ProviderType::MarketData,
-                'base_url' => 'https://api.twelvedata.com', 'priority' => 30, 'status' => ProviderStatus::Unknown],
+                'base_url' => 'https://api.twelvedata.com', 'priority' => 30, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 5, 'fetch_limit' => 50,
+                'markets' => ['NASDAQ'], 'capabilities' => ['quotes', 'candles'], 'auto_sync_stocks' => false],
+            ['key' => 'fmp', 'name' => 'Financial Modeling Prep', 'type' => ProviderType::MarketData,
+                'base_url' => 'https://financialmodelingprep.com/stable', 'priority' => 40, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 1440, 'fetch_limit' => 50,
+                'markets' => ['NASDAQ'], 'capabilities' => ['list', 'profiles'], 'auto_sync_stocks' => true],
+            ['key' => 'rapidapi-bist100', 'name' => 'RapidAPI BIST100', 'type' => ProviderType::MarketData,
+                'base_url' => 'https://bist100-stock-data-15-minutes-late-live.p.rapidapi.com', 'priority' => 45, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 5, 'fetch_limit' => 100,
+                'markets' => ['BIST'], 'capabilities' => ['list', 'quotes'], 'auto_sync_stocks' => false],
             ['key' => 'synthetic-news', 'name' => 'Synthetic News Wire', 'type' => ProviderType::News,
-                'base_url' => null, 'priority' => 10, 'status' => ProviderStatus::Operational],
+                'base_url' => null, 'priority' => 10, 'status' => ProviderStatus::Operational, 'refresh_interval_minutes' => 5, 'fetch_limit' => 50,
+                'markets' => null, 'capabilities' => ['news'], 'auto_sync_stocks' => false],
             ['key' => 'finnhub-news', 'name' => 'Finnhub News', 'type' => ProviderType::News,
-                'base_url' => 'https://finnhub.io/api/v1', 'priority' => 20, 'status' => ProviderStatus::Unknown],
+                'base_url' => 'https://finnhub.io/api/v1', 'priority' => 20, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 5, 'fetch_limit' => 50,
+                'markets' => ['NASDAQ'], 'capabilities' => ['news'], 'auto_sync_stocks' => false],
             ['key' => 'kap', 'name' => 'KAP (Public Disclosures)', 'type' => ProviderType::News,
-                'base_url' => 'https://www.kap.org.tr', 'priority' => 25, 'status' => ProviderStatus::Unknown],
+                'base_url' => 'https://www.kap.org.tr', 'priority' => 25, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 5, 'fetch_limit' => 50,
+                'markets' => ['BIST'], 'capabilities' => ['news'], 'auto_sync_stocks' => false],
+            ['key' => 'rss', 'name' => 'RSS Feeds', 'type' => ProviderType::News,
+                'base_url' => null, 'priority' => 15, 'status' => ProviderStatus::Operational, 'refresh_interval_minutes' => 5, 'fetch_limit' => 120,
+                'markets' => null, 'capabilities' => ['news'], 'auto_sync_stocks' => false],
         ];
 
         foreach ($providers as $provider) {
-            ApiProvider::query()->updateOrCreate(
-                ['key' => $provider['key']],
-                $provider + ['is_active' => true],
-            );
+            $existing = ApiProvider::query()->where('key', $provider['key'])->first();
+
+            if ($existing instanceof ApiProvider) {
+                $existing->update($provider);
+
+                continue;
+            }
+
+            ApiProvider::query()->create($provider + ['is_active' => true]);
+        }
+
+        $this->seedRssSources();
+    }
+
+    /**
+     * Register a news_sources row per configured RSS feed so each origin is
+     * tracked (and toggleable in the admin panel) even after duplicate merging.
+     */
+    private function seedRssSources(): void
+    {
+        /** @var array<int, array<string, mixed>> $feeds */
+        $feeds = (array) config('tradenews.news.providers.rss.feeds', []);
+
+        foreach ($feeds as $feed) {
+            $attributes = [
+                'name' => $feed['name'],
+                'provider' => 'rss',
+                'market' => $feed['market'] ?? null,
+                'feed_url' => $feed['url'] ?? null,
+                'homepage_url' => $feed['homepage_url'] ?? null,
+            ];
+
+            $existing = NewsSource::query()->where('key', $feed['key'])->first();
+
+            if ($existing instanceof NewsSource) {
+                $existing->update($attributes);
+
+                continue;
+            }
+
+            NewsSource::query()->create($attributes + [
+                'key' => $feed['key'],
+                'is_active' => true,
+            ]);
         }
     }
 }

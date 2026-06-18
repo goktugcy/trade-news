@@ -7,7 +7,12 @@ namespace App\Services\News;
 use App\DataTransferObjects\NewsItemData;
 use App\Enums\Market;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Real news integration against Finnhub's general market-news endpoint.
@@ -23,17 +28,25 @@ class FinnhubNewsProvider implements NewsProviderInterface
 
     public function key(): string
     {
-        return 'finnhub';
+        return 'finnhub-news';
     }
 
     public function fetchLatest(?Market $market = null, int $limit = 50): array
     {
-        $response = Http::baseUrl($this->baseUrl)
-            ->timeout(10)
-            ->retry(2, 200)
-            ->get('/news', ['category' => 'general', 'token' => $this->apiKey]);
+        try {
+            $response = $this->client()->get('/news', ['category' => 'general', 'token' => $this->apiKey]);
+        } catch (ConnectionException $exception) {
+            Log::warning('Finnhub news connection failed', ['error' => $exception->getMessage()]);
+
+            return [];
+        }
 
         if ($response->failed()) {
+            Log::warning('Finnhub news failed', [
+                'status' => $response->status(),
+                'body' => str($response->body())->limit(160)->toString(),
+            ]);
+
             return [];
         }
 
@@ -63,5 +76,23 @@ class FinnhubNewsProvider implements NewsProviderInterface
         }
 
         return $items;
+    }
+
+    private function client(): PendingRequest
+    {
+        return Http::baseUrl($this->baseUrl)
+            ->connectTimeout(3)
+            ->timeout(10)
+            ->retry(
+                [200, 500],
+                when: fn (Throwable $exception): bool => $this->shouldRetry($exception),
+                throw: false,
+            );
+    }
+
+    private function shouldRetry(Throwable $exception): bool
+    {
+        return $exception instanceof ConnectionException
+            || ($exception instanceof RequestException && $exception->response->serverError());
     }
 }

@@ -11,6 +11,7 @@ export type NewsCardData = {
     id: number;
     title: string;
     summary: string | null;
+    has_ai_summary: boolean;
     url: string | null;
     image_url: string | null;
     market: Market | null;
@@ -20,6 +21,8 @@ export type NewsCardData = {
     published_at: string | null;
     published_for_humans: string | null;
     source: string | null;
+    source_count: number;
+    sources: { name: string | null; url: string | null }[];
     stocks: StockRef[];
 };
 
@@ -31,6 +34,9 @@ export type StockRow = {
     exchange: string | null;
     currency: string;
     sector: string | null;
+    industry?: string | null;
+    market_cap?: number | null;
+    website?: string | null;
     is_active: boolean;
     price: number | null;
     change: number | null;
@@ -48,16 +54,30 @@ export type Candle = {
     low: number;
     close: number;
     volume: number;
+    provider_key: string | null;
+    source_kind: 'candle' | 'quote' | 'synthetic';
 };
+
+export type DataPreferences = {
+    auto_refresh_seconds: number;
+};
+
+export type MarketSessionValue = 'open' | 'closed' | 'pre_market' | 'after_hours' | 'holiday' | 'weekend';
 
 export type MarketStatusInfo = {
     market: Market;
     label: string;
+    session: MarketSessionValue;
+    session_label: string;
+    session_color: string;
     is_open: boolean;
-    local_time: string;
-    timezone: string;
     opens_at: string;
     closes_at: string;
+    display_timezone: string;
+    market_timezone: string;
+    local_time: string;
+    next_open: string | null;
+    next_close: string | null;
 };
 
 export type PaginatedNews = {

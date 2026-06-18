@@ -34,7 +34,7 @@ class UserFactory extends Factory
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
             'is_admin' => false,
-            'timezone' => 'UTC',
+            'timezone' => 'Europe/Istanbul',
         ];
     }
 

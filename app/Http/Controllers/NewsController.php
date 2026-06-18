@@ -58,8 +58,9 @@ class NewsController extends Controller
 
         return NewsItem::query()
             ->where('is_matched', true)
+            ->fromActiveSource()
             ->published()
-            ->with(['stocks:id,symbol,market', 'source:id,name'])
+            ->with(['stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name'])
             ->when(
                 in_array($market, [Market::BIST->value, Market::NASDAQ->value], true),
                 fn (Builder $q) => $q->where('market', $market),

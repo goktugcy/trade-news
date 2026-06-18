@@ -6,8 +6,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
+use App\Models\ProviderEvent;
+use App\Models\SyncRun;
 use App\Models\SystemJob;
+use App\Models\UserNotification;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -88,6 +92,81 @@ class AdminSystemController extends Controller
             ]);
 
         return Inertia::render('admin/Notifications', [
+            'logs' => $logs,
+        ]);
+    }
+
+    public function providerEvents(): Response
+    {
+        $events = ProviderEvent::query()
+            ->with('provider:id,key,name')
+            ->latest('id')
+            ->paginate(40)
+            ->through(fn (ProviderEvent $e) => [
+                'id' => $e->id,
+                'provider' => $e->provider->name,
+                'from_status' => $e->from_status?->value,
+                'to_status' => $e->to_status->value,
+                'to_color' => $e->to_status->color(),
+                'reason' => $e->reason,
+                'created_at' => $e->created_at?->toDateTimeString(),
+            ]);
+
+        return Inertia::render('admin/ProviderEvents', [
+            'events' => $events,
+        ]);
+    }
+
+    public function syncLogs(): Response
+    {
+        $runs = SyncRun::query()
+            ->latest('id')
+            ->paginate(30)
+            ->through(fn (SyncRun $r) => [
+                'id' => $r->id,
+                'type' => $r->type,
+                'provider_key' => $r->provider_key,
+                'status' => $r->status,
+                'processed' => $r->processed,
+                'created_count' => $r->created_count,
+                'updated_count' => $r->updated_count,
+                'error' => $r->error,
+                'started_at' => $r->started_at?->toDateTimeString(),
+                'finished_at' => $r->finished_at?->toDateTimeString(),
+            ]);
+
+        $summary = (new Collection(['nasdaq_list', 'company_profiles']))->mapWithKeys(fn (string $type) => [
+            $type => [
+                'last_success' => SyncRun::lastOfStatus($type, SyncRun::STATUS_SUCCESS)?->finished_at?->diffForHumans(),
+                'last_failure' => SyncRun::lastOfStatus($type, SyncRun::STATUS_FAILED)?->finished_at?->diffForHumans(),
+            ],
+        ]);
+
+        return Inertia::render('admin/SyncLogs', [
+            'runs' => $runs,
+            'summary' => $summary,
+        ]);
+    }
+
+    public function systemNotifications(): Response
+    {
+        $logs = UserNotification::query()
+            ->whereIn('category', ['provider', 'sync', 'system'])
+            ->with('user:id,name')
+            ->latest('id')
+            ->paginate(30)
+            ->through(fn (UserNotification $n) => [
+                'id' => $n->id,
+                'user' => $n->user?->name,
+                'category' => $n->category->value,
+                'type' => $n->type,
+                'title' => $n->title,
+                'body' => $n->body,
+                'is_read' => $n->isRead(),
+                'created_at' => $n->created_at?->toDateTimeString(),
+            ]);
+
+        return Inertia::render('admin/SystemNotifications', [
             'logs' => $logs,
         ]);
     }

@@ -55,7 +55,7 @@ function retry(uuid: string) {
 <template>
     <Head title="Admin · Jobs & Health" />
 
-    <div class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4">
+    <div class="mx-auto flex w-full flex-1 flex-col gap-4 p-4">
         <AdminNav />
 
         <!-- Scheduled job runs -->

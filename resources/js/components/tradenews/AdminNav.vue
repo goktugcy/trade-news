@@ -9,9 +9,12 @@ const tabs = [
     { title: 'Stocks', href: '/admin/stocks' },
     { title: 'News Sources', href: '/admin/news-sources' },
     { title: 'API Providers', href: '/admin/providers' },
+    { title: 'Provider Events', href: '/admin/provider-events' },
+    { title: 'Sync Logs', href: '/admin/sync-logs' },
     { title: 'Users', href: '/admin/users' },
     { title: 'Jobs & Health', href: '/admin/jobs' },
     { title: 'Notifications', href: '/admin/notifications' },
+    { title: 'System', href: '/admin/system-notifications' },
 ];
 </script>
 

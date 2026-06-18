@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\AlertType;
 use App\Enums\Market;
 use App\Enums\NotificationInterval;
 use App\Enums\Sentiment;
 use App\Http\Requests\StoreNotificationRuleRequest;
 use App\Models\NotificationRule;
+use App\Models\StockAlert;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -34,9 +36,33 @@ class NotificationRuleController extends Controller
                 'last_dispatched_at' => $rule->last_dispatched_at?->diffForHumans(),
             ]);
 
+        $stockAlerts = $request->user()->stockAlerts()
+            ->with('stock:id,symbol,name,market')
+            ->get()
+            ->map(fn (StockAlert $a) => [
+                'id' => $a->id,
+                'stock_id' => $a->stock_id,
+                'symbol' => $a->stock?->symbol,
+                'type' => $a->type->value,
+                'type_label' => $a->type->label(),
+                'threshold' => $a->threshold,
+                'cooldown_minutes' => $a->cooldown_minutes,
+                'is_active' => $a->is_active,
+                'notify_in_app' => $a->notify_in_app,
+                'notify_telegram' => $a->notify_telegram,
+                'last_triggered_at' => $a->last_triggered_at?->diffForHumans(),
+            ]);
+
+        $watchlistStocks = $request->user()->watchedStocks()
+            ->get(['stocks.id', 'symbol', 'name'])
+            ->map(fn ($s) => ['id' => $s->id, 'symbol' => $s->symbol, 'name' => $s->name]);
+
         return Inertia::render('alerts/Index', [
             'rules' => $rules,
             'options' => $this->options(),
+            'stockAlerts' => $stockAlerts,
+            'alertTypes' => AlertType::options(),
+            'watchlistStocks' => $watchlistStocks,
             'telegramConnected' => (bool) $request->user()->telegramIntegration?->isActive(),
         ]);
     }

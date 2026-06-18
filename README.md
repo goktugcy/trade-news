@@ -21,6 +21,8 @@ light/dark mode.
 | Frontend | Inertia.js + Vue 3 + TypeScript |
 | Styling | Tailwind CSS v4 (shadcn-vue / reka-ui components) |
 | Charts | [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts) |
+| News feeds | RSS/Atom via `laminas/laminas-feed` (9 sources) + Finnhub + KAP |
+| AI summaries | OpenAI (optional, via Laravel's HTTP client — no SDK; graceful no-key fallback) |
 | Auth | Laravel Fortify (incl. 2FA + passkeys from the starter kit) |
 | Notifications | Telegram Bot API (via Laravel's HTTP client — no extra SDK) |
 | Tests | Pest 4 |
@@ -176,13 +178,62 @@ NEWS_PROVIDER=synthetic              # synthetic | finnhub | kap
 FINNHUB_KEY=
 TWELVEDATA_KEY=
 
+# AI summaries (optional — no key = falls back to the article's own summary)
+AI_PROVIDER=openai
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+
 # Telegram
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_BOT_USERNAME=
 TELEGRAM_WEBHOOK_SECRET=change-me
 ```
 
-All tunables (cache TTLs, retention windows) live in `config/tradenews.php`.
+All tunables (RSS feed URLs, market holidays, cache TTLs, retention windows) live in
+`config/tradenews.php`. News providers, refresh intervals and fetch limits are managed at runtime
+in the `api_providers` table (admin panel).
+
+### RSS aggregation, timezones & AI summaries
+
+- **RSS news aggregation** — `RssNewsProvider` (built on `laminas/laminas-feed`) pulls 9 sources
+  (Reuters, MarketWatch, Yahoo Finance, CNBC, Investing.com, KAP, Bloomberg HT, Foreks, Investing
+  Türkiye), configured under `tradenews.news.providers.rss.feeds`. Each feed is its own
+  `news_sources` row. `tradenews:fetch-news` fans out one queued job **per active provider**, so
+  all sources contribute (not just the first).
+- **Cross-source merge** — the same story from multiple outlets collapses into one article
+  (`TitleNormalizer` fingerprint + ±48h window), tracked in `news_item_sources` with a
+  `source_count`. The feed shows “+N more” and corroboration nudges importance up.
+- **Per-user timezone** — set in **Settings → Profile** (default `Europe/Istanbul`). Timestamps are
+  stored UTC and rendered in the user's zone client-side (`resources/js/lib/date.ts`). Market
+  open/close, news times, and Telegram alerts all display in that zone; daily/interval alert timing
+  is evaluated in the user's local time.
+- **MarketSessionService** — reports each exchange as open / closed / pre-market / after-hours /
+  holiday / weekend, with open/close rendered in the viewer's timezone. Holiday calendars live in
+  `config/tradenews.php` (`market_holidays`, refreshed yearly).
+- **AI summaries (optional)** — with `OPENAI_API_KEY` set, `GenerateNewsSummaryJob` adds a neutral
+  2–3 sentence summary per article via OpenAI (rate-limited). Without a key it no-ops and the feed
+  shows the article's own summary — nothing breaks.
+
+### Notifications, alerts, provider health & FMP sync
+
+- **In-app notification inbox** — a header bell (unread badge, polled on the user's auto-refresh
+  cadence) + a dedicated `/notifications` page with read/unread, categories and filtering. Backed by
+  `user_notifications` and `App\Services\Notification\NotificationCenter` (`toUser` / `toAdmins`),
+  which can also fan a message to Telegram.
+- **Custom alerts** — `/alerts` has a second tab for condition alerts: price above/below, %-change,
+  volume, news-detected, important-news, each with a cooldown and in-app + optional Telegram
+  delivery. `tradenews:evaluate-alerts` (every minute) runs `AlertEvaluator` against the latest
+  cached quote / matched news.
+- **Provider state machine** — `ProviderHealthService` moves each provider Operational → Degraded →
+  Down → (auto-recovers) based on the health probe's success/failure, supports manual Disabled, and
+  logs every transition to `provider_events` + notifies admins. Admins get full CRUD over providers
+  (markets, capabilities, priority, refresh, auto-recovery) at `/admin/providers`.
+- **FMP NASDAQ sync (optional)** — with `FMP_API_KEY`, `tradenews:sync-nasdaq` (weekly) refreshes
+  the NASDAQ universe and `tradenews:sync-profiles` (daily) fills sector/industry/market-cap/profile
+  via Financial Modeling Prep; runs are tracked in `sync_runs`. Without a key it falls back to the
+  Finnhub-based `tradenews:sync-nasdaq-stocks`. Quotes/candles stay on Finnhub/TwelveData.
+- **Admin monitoring** — `/admin/provider-events`, `/admin/sync-logs` (last success/failure per
+  sync type) and `/admin/system-notifications` (provider/sync/system events sent to admins).
 
 ---
 
@@ -193,17 +244,20 @@ Registered in `routes/console.php` (run with `php artisan schedule:work`):
 | Command | Cadence | Purpose |
 | --- | --- | --- |
 | `tradenews:fetch-prices` | every 5 min | dispatch a price-fetch job per active stock |
-| `tradenews:fetch-news` | every 5 min | fetch + dedupe news, chain sentiment + matching |
+| `tradenews:fetch-news` | every 5 min | fan out per active provider; fetch + merge news, chain sentiment + matching + AI summary |
 | `tradenews:match-news` | every 10 min | safety-net match sweep for unmatched items |
-| `tradenews:dispatch-notifications` | every 5 min | queue Telegram alerts for rules due this minute |
-| `tradenews:check-providers` | every 30 min | probe provider health → `api_providers` |
+| `tradenews:dispatch-notifications` | every 5 min | queue Telegram alerts for news rules due this minute (per-user tz) |
+| `tradenews:evaluate-alerts` | every min | evaluate custom price/volume/news alerts → in-app + Telegram |
+| `tradenews:check-providers` | every 30 min | probe providers → status state machine + events |
+| `tradenews:sync-nasdaq` | weekly | FMP NASDAQ universe sync (fallback: Finnhub) |
+| `tradenews:sync-profiles` | daily 02:30 | FMP company profiles/metadata |
 | `tradenews:cleanup` | daily 03:30 | prune old prices/news/notifications + dedupe |
 
 Run any once manually, e.g. `php artisan tradenews:fetch-news`.
 
 Notification cadence: the dispatcher runs every 5 minutes and itself decides which user rules
-(5m / 15m / 30m / 1h / 3h / 5h / 1d) are *due* based on the minute-of-day, then sends only news
-the user hasn't already been alerted about.
+(5m / 15m / 30m / 1h / 3h / 5h / 1d) are *due* based on the minute-of-day **in each user's
+timezone**, then sends only news the user hasn't already been alerted about.
 
 ---
 

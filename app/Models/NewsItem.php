@@ -21,6 +21,8 @@ use Illuminate\Support\Carbon;
  * @property int|null $source_id
  * @property string $title
  * @property string|null $summary
+ * @property string|null $ai_summary
+ * @property Carbon|null $ai_summary_generated_at
  * @property string|null $content
  * @property string|null $url
  * @property Carbon|null $published_at
@@ -30,8 +32,11 @@ use Illuminate\Support\Carbon;
  * @property int $importance_score
  * @property bool $is_matched
  * @property string $hash
+ * @property string|null $normalized_hash
+ * @property int $source_count
  * @property-read NewsSource|null $source
  * @property-read Collection<int, Stock> $stocks
+ * @property-read Collection<int, NewsItemSource> $sources
  */
 class NewsItem extends Model
 {
@@ -41,20 +46,22 @@ class NewsItem extends Model
     public const UPDATED_AT = null; // created_at only
 
     protected $fillable = [
-        'source_id', 'title', 'summary', 'content', 'url', 'image_url',
+        'source_id', 'title', 'summary', 'ai_summary', 'ai_summary_generated_at', 'content', 'url', 'image_url',
         'published_at', 'market', 'sentiment', 'sentiment_score',
-        'importance_score', 'is_matched', 'hash',
+        'importance_score', 'is_matched', 'hash', 'normalized_hash', 'source_count',
     ];
 
     protected function casts(): array
     {
         return [
             'published_at' => 'datetime',
+            'ai_summary_generated_at' => 'datetime',
             'market' => Market::class,
             'sentiment' => Sentiment::class,
             'sentiment_score' => 'float',
             'importance_score' => 'integer',
             'is_matched' => 'boolean',
+            'source_count' => 'integer',
         ];
     }
 
@@ -72,6 +79,16 @@ class NewsItem extends Model
     public function source(): BelongsTo
     {
         return $this->belongsTo(NewsSource::class, 'source_id');
+    }
+
+    /**
+     * Every original source this (possibly merged) article was reported by.
+     *
+     * @return HasMany<NewsItemSource, $this>
+     */
+    public function sources(): HasMany
+    {
+        return $this->hasMany(NewsItemSource::class);
     }
 
     /**
@@ -105,5 +122,11 @@ class NewsItem extends Model
     public function scopePublished(Builder $query): void
     {
         $query->whereNotNull('published_at')->orderByDesc('published_at');
+    }
+
+    /** @param  Builder<NewsItem>  $query */
+    public function scopeFromActiveSource(Builder $query): void
+    {
+        $query->whereHas('source', fn (Builder $source): Builder => $source->where('is_active', true));
     }
 }

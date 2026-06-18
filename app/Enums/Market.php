@@ -47,6 +47,23 @@ enum Market: string
     }
 
     /**
+     * Extended-hours (pre-market / after-hours) windows in the market's own
+     * timezone, or null when the exchange has no extended session (BIST).
+     *
+     * @return array{pre: array{open: string, close: string}, after: array{open: string, close: string}}|null
+     */
+    public function extendedHours(): ?array
+    {
+        return match ($this) {
+            self::NASDAQ => [
+                'pre' => ['open' => '04:00', 'close' => '09:30'],
+                'after' => ['open' => '16:00', 'close' => '20:00'],
+            ],
+            self::BIST => null,
+        };
+    }
+
+    /**
      * @return array<int, array{value: string, label: string, currency: string}>
      */
     public static function options(): array

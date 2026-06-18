@@ -36,6 +36,12 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <!-- Never use real provider secrets in tests (don't inherit them from .env). -->
+        <env name="FINNHUB_KEY" value=""/>
+        <env name="TWELVEDATA_KEY" value=""/>
+        <env name="FMP_API_KEY" value=""/>
+        <env name="OPENAI_API_KEY" value=""/>
+        <env name="TELEGRAM_BOT_TOKEN" value=""/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

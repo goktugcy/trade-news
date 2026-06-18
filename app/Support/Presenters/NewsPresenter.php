@@ -19,7 +19,8 @@ class NewsPresenter
         return [
             'id' => $item->id,
             'title' => $item->title,
-            'summary' => $item->summary,
+            'summary' => $item->ai_summary ?: $item->summary,
+            'has_ai_summary' => $item->ai_summary !== null,
             'url' => $item->url,
             'image_url' => $item->image_url,
             'market' => $item->market?->value,
@@ -29,6 +30,14 @@ class NewsPresenter
             'published_at' => $item->published_at?->toIso8601String(),
             'published_for_humans' => $item->published_at?->diffForHumans(),
             'source' => $item->relationLoaded('source') ? $item->source?->name : null,
+            'source_count' => $item->source_count,
+            // Every original outlet this (possibly merged) story came from.
+            'sources' => $item->relationLoaded('sources')
+                ? $item->sources->map(fn ($s) => [
+                    'name' => $s->relationLoaded('source') ? $s->source?->name : null,
+                    'url' => $s->url,
+                ])->filter(fn ($s) => $s['name'] !== null)->values()->all()
+                : [],
             'stocks' => $item->relationLoaded('stocks')
                 ? $item->stocks->map(fn ($stock) => [
                     'id' => $stock->id,

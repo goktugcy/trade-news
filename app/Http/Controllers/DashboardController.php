@@ -6,8 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Models\NewsItem;
 use App\Models\Watchlist;
+use App\Services\Market\MarketSessionService;
 use App\Services\MarketData\MarketSummaryService;
-use App\Support\MarketStatus;
 use App\Support\Presenters\NewsPresenter;
 use App\Support\Presenters\StockPresenter;
 use Illuminate\Http\Request;
@@ -16,7 +16,7 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, MarketSummaryService $summary): Response
+    public function __invoke(Request $request, MarketSummaryService $summary, MarketSessionService $sessions): Response
     {
         $user = $request->user();
 
@@ -24,8 +24,9 @@ class DashboardController extends Controller
 
         $feed = NewsItem::query()
             ->where('is_matched', true)
+            ->fromActiveSource()
             ->published()
-            ->with(['stocks:id,symbol,market', 'source:id,name'])
+            ->with(['stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name'])
             ->limit(12)
             ->get();
 
@@ -54,12 +55,13 @@ class DashboardController extends Controller
             'feed' => NewsPresenter::collection($feed),
             'watchlist' => $watchlist,
             'topMovers' => $summary->topMovers(),
-            'marketStatus' => MarketStatus::all(),
+            'marketStatus' => $sessions->all($user->timezone),
             'latestAlerts' => $latestAlerts,
             'stats' => [
                 'watchlist_count' => $watchlistStockIds->count(),
                 'matched_news_today' => NewsItem::query()
                     ->where('is_matched', true)
+                    ->fromActiveSource()
                     ->where('published_at', '>=', now()->startOfDay())
                     ->count(),
             ],

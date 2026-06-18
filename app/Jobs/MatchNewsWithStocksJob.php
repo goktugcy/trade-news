@@ -26,7 +26,10 @@ class MatchNewsWithStocksJob implements ShouldQueue
     /**
      * @param  array<int, int>|null  $newsItemIds
      */
-    public function __construct(public ?array $newsItemIds = null) {}
+    public function __construct(
+        public ?array $newsItemIds = null,
+        public bool $repairMarkets = false,
+    ) {}
 
     public function handle(NewsMatcherService $matcher): void
     {
@@ -34,7 +37,7 @@ class MatchNewsWithStocksJob implements ShouldQueue
             ->when(
                 $this->newsItemIds !== null,
                 fn ($q) => $q->whereIn('id', $this->newsItemIds),
-                fn ($q) => $q->where('is_matched', false),
+                fn ($q) => $this->repairMarkets ? $q : $q->where('is_matched', false),
             );
 
         $query->chunkById(200, function ($items) use ($matcher): void {

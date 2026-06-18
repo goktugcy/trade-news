@@ -7,7 +7,7 @@ import NewsFeed from '@/components/tradenews/NewsFeed.vue';
 import PriceChange from '@/components/tradenews/PriceChange.vue';
 import StockChart from '@/components/tradenews/StockChart.vue';
 import { Button } from '@/components/ui/button';
-import { formatPrice } from '@/lib/format';
+import { formatNumber, formatPrice } from '@/lib/format';
 import type { NewsCardData, SelectOption, StockRow } from '@/types';
 
 const props = defineProps<{
@@ -46,7 +46,7 @@ function toggleAlert() {
 <template>
     <Head :title="`${stock.symbol} · ${stock.name}`" />
 
-    <div class="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 p-4">
+    <div class="mx-auto flex w-full flex-1 flex-col gap-4 p-4">
         <!-- Header -->
         <div class="flex flex-col gap-4 rounded-xl border border-sidebar-border/70 bg-card p-5 sm:flex-row sm:items-start sm:justify-between dark:border-sidebar-border">
             <div>
@@ -55,7 +55,13 @@ function toggleAlert() {
                     <MarketBadge :market="stock.market" />
                 </div>
                 <p class="text-sm text-muted-foreground">{{ stock.name }}</p>
-                <p v-if="stock.sector" class="mt-0.5 text-xs text-muted-foreground">{{ stock.sector }} · {{ stock.exchange }}</p>
+                <p v-if="stock.sector || stock.industry || stock.exchange" class="mt-0.5 text-xs text-muted-foreground">
+                    {{ [stock.sector, stock.industry, stock.exchange].filter(Boolean).join(' · ') }}
+                </p>
+                <p v-if="stock.market_cap" class="mt-0.5 text-xs text-muted-foreground">
+                    Market cap {{ formatNumber(stock.market_cap) }}
+                    <a v-if="stock.website" :href="stock.website" target="_blank" rel="noopener" class="ml-1 text-foreground hover:underline">· Website ↗</a>
+                </p>
             </div>
 
             <div class="flex flex-col items-start gap-2 sm:items-end">

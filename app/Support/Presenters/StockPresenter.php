@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Support\Presenters;
 
 use App\Models\Stock;
+use App\Models\StockPrice;
 use App\Services\MarketData\MarketDataIngestor;
+use App\Services\Providers\ApiProviderRegistry;
 
 /**
  * Shapes stocks (with their cached quote, falling back to the latest stored
@@ -29,6 +31,9 @@ class StockPresenter
             'exchange' => $stock->exchange,
             'currency' => $stock->currency,
             'sector' => $stock->sector,
+            'industry' => $stock->industry,
+            'market_cap' => $stock->market_cap,
+            'website' => $stock->website,
             'is_active' => $stock->is_active,
             'price' => $quote['price'] ?? null,
             'change' => $quote['change'] ?? null,
@@ -46,9 +51,10 @@ class StockPresenter
      */
     public static function quote(Stock $stock): array
     {
+        $hideSynthetic = self::hideSyntheticMarketData();
         $cached = MarketDataIngestor::cachedQuote($stock->id);
 
-        if ($cached !== null) {
+        if ($cached !== null && ! self::shouldHideCachedQuote($cached, $hideSynthetic)) {
             return $cached;
         }
 
@@ -63,6 +69,7 @@ class StockPresenter
         // Approximate change from the previous candle's close (the column value,
         // or the latest open when this is the only candle).
         $previousClose = $stock->prices()
+            ->withoutSyntheticWhenApiActive($hideSynthetic)
             ->where('timeframe', $latest->timeframe->value)
             ->where('price_at', '<', $latest->price_at)
             ->orderByDesc('price_at')
@@ -78,5 +85,27 @@ class StockPresenter
             'change_percent' => $changePercent,
             'at' => $latest->price_at->toIso8601String(),
         ];
+    }
+
+    private static function hideSyntheticMarketData(): bool
+    {
+        return app(ApiProviderRegistry::class)->shouldHideSyntheticMarketData();
+    }
+
+    /**
+     * @param  array<string, mixed>  $quote
+     */
+    private static function shouldHideCachedQuote(array $quote, bool $apiActive): bool
+    {
+        if (! $apiActive) {
+            return false;
+        }
+
+        $providerKey = is_string($quote['provider_key'] ?? null) ? $quote['provider_key'] : null;
+        $sourceKind = is_string($quote['source_kind'] ?? null) ? $quote['source_kind'] : null;
+
+        return $providerKey === null
+            || ApiProviderRegistry::isSyntheticKey($providerKey)
+            || $sourceKind === StockPrice::SOURCE_SYNTHETIC;
     }
 }

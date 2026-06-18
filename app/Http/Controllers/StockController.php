@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\Market;
+use App\Enums\ProviderType;
 use App\Enums\Timeframe;
 use App\Models\Stock;
+use App\Models\StockPrice;
+use App\Services\MarketData\MarketDataIngestor;
+use App\Services\Providers\ApiProviderRegistry;
 use App\Support\Presenters\NewsPresenter;
 use App\Support\Presenters\StockPresenter;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -61,7 +66,8 @@ class StockController extends Controller
 
         $relatedNews = $stock->news()
             ->where('is_matched', true)
-            ->with(['stocks:id,symbol,market', 'source:id,name'])
+            ->whereHas('source', fn (Builder $q) => $q->where('is_active', true))
+            ->with(['stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name'])
             ->orderByDesc('published_at')
             ->limit(20)
             ->get();
@@ -83,28 +89,33 @@ class StockController extends Controller
     /**
      * OHLC candle data for the chart (read from stored prices, JSON).
      */
-    public function candles(Request $request, Stock $stock): JsonResponse
+    public function candles(Request $request, Stock $stock, ApiProviderRegistry $providers): JsonResponse
     {
         $timeframe = Timeframe::tryFrom($request->string('timeframe')->toString()) ?? Timeframe::FiveMinutes;
+        $apiActive = $providers->hasActiveRealProvider(ProviderType::MarketData);
+        $hideSynthetic = $providers->shouldHideSyntheticMarketData();
 
         $candles = $stock->prices()
             ->timeframe($timeframe)
-            ->orderBy('price_at')
+            ->withoutSyntheticWhenApiActive($hideSynthetic)
+            ->latest('price_at')
             ->limit(300)
-            ->get(['open', 'high', 'low', 'close', 'volume', 'price_at'])
-            ->map(fn ($c) => [
-                'time' => $c->price_at->getTimestamp(),
-                'open' => (float) $c->open,
-                'high' => (float) $c->high,
-                'low' => (float) $c->low,
-                'close' => (float) $c->close,
-                'volume' => (float) $c->volume,
-            ]);
+            ->get(['open', 'high', 'low', 'close', 'volume', 'price_at', 'provider_key', 'source_kind'])
+            ->sortBy('price_at')
+            ->values()
+            ->map(fn (StockPrice $price): array => $this->candlePayload($price))
+            ->all();
 
         return response()->json([
             'symbol' => $stock->symbol,
             'timeframe' => $timeframe->value,
-            'candles' => $candles,
+            'candles' => $this->withCachedQuoteCandle($candles, $stock, $timeframe, $hideSynthetic),
+            'source' => [
+                'mode' => $apiActive ? 'api' : 'development',
+                'api_active' => $apiActive,
+                'synthetic_hidden' => $hideSynthetic,
+                'provider_keys' => $providers->activeProviderKeys(ProviderType::MarketData),
+            ],
         ]);
     }
 
@@ -133,5 +144,76 @@ class StockController extends Controller
             ]);
 
         return response()->json(['results' => $results]);
+    }
+
+    /**
+     * @param  array<int, array{time: int, open: float, high: float, low: float, close: float, volume: float, provider_key: string|null, source_kind: string}>  $candles
+     * @return array<int, array{time: int, open: float, high: float, low: float, close: float, volume: float, provider_key: string|null, source_kind: string}>
+     */
+    private function withCachedQuoteCandle(array $candles, Stock $stock, Timeframe $timeframe, bool $hideSynthetic): array
+    {
+        $collection = collect($candles);
+        $quote = MarketDataIngestor::cachedQuote($stock->id);
+
+        if (! is_array($quote) || ! isset($quote['price'], $quote['at'])) {
+            return $collection->values()->all();
+        }
+
+        $providerKey = is_string($quote['provider_key'] ?? null) ? $quote['provider_key'] : null;
+        $sourceKind = is_string($quote['source_kind'] ?? null) ? $quote['source_kind'] : StockPrice::SOURCE_QUOTE;
+
+        if ($this->shouldHideQuote($hideSynthetic, $providerKey, $sourceKind)) {
+            return $collection->values()->all();
+        }
+
+        $time = $this->bucketTime(CarbonImmutable::parse((string) $quote['at']), $timeframe);
+        $price = (float) $quote['price'];
+
+        return $collection
+            ->reject(fn (array $candle): bool => (int) $candle['time'] === $time)
+            ->push([
+                'time' => $time,
+                'open' => $timeframe->isIntraday() ? $price : (float) ($quote['open'] ?? $price),
+                'high' => $timeframe->isIntraday() ? $price : (float) ($quote['high'] ?? $price),
+                'low' => $timeframe->isIntraday() ? $price : (float) ($quote['low'] ?? $price),
+                'close' => $price,
+                'volume' => (float) ($quote['volume'] ?? 0),
+                'provider_key' => $providerKey,
+                'source_kind' => $sourceKind,
+            ])
+            ->sortBy('time')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array{time: int, open: float, high: float, low: float, close: float, volume: float, provider_key: string|null, source_kind: string}
+     */
+    private function candlePayload(StockPrice $price): array
+    {
+        return [
+            'time' => (int) $price->price_at->getTimestamp(),
+            'open' => (float) $price->open,
+            'high' => (float) $price->high,
+            'low' => (float) $price->low,
+            'close' => (float) $price->close,
+            'volume' => (float) $price->volume,
+            'provider_key' => $price->provider_key,
+            'source_kind' => $price->source_kind,
+        ];
+    }
+
+    private function shouldHideQuote(bool $hideSynthetic, ?string $providerKey, string $sourceKind): bool
+    {
+        return $hideSynthetic && (
+            $providerKey === null
+            || ApiProviderRegistry::isSyntheticKey($providerKey)
+            || $sourceKind === StockPrice::SOURCE_SYNTHETIC
+        );
+    }
+
+    private function bucketTime(CarbonImmutable $at, Timeframe $timeframe): int
+    {
+        return intdiv($at->getTimestamp(), $timeframe->seconds()) * $timeframe->seconds();
     }
 }

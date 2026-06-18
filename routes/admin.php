@@ -20,11 +20,22 @@ Route::middleware(['auth', 'verified', 'admin'])
 
         // News sources
         Route::get('news-sources', [AdminCatalogController::class, 'newsSources'])->name('news-sources.index');
+        Route::post('news-sources', [AdminCatalogController::class, 'storeNewsSource'])->name('news-sources.store');
+        Route::put('news-sources/{newsSource}', [AdminCatalogController::class, 'updateNewsSource'])->name('news-sources.update');
         Route::patch('news-sources/{newsSource}/toggle', [AdminCatalogController::class, 'toggleNewsSource'])->name('news-sources.toggle');
+        Route::delete('news-sources/{newsSource}', [AdminCatalogController::class, 'destroyNewsSource'])->name('news-sources.destroy');
 
-        // API providers
+        // API providers (full CRUD)
         Route::get('providers', [AdminCatalogController::class, 'apiProviders'])->name('providers.index');
+        Route::post('providers', [AdminCatalogController::class, 'storeApiProvider'])->name('providers.store');
         Route::put('providers/{apiProvider}', [AdminCatalogController::class, 'updateApiProvider'])->name('providers.update');
+        Route::delete('providers/synthetic-data', [AdminCatalogController::class, 'purgeSyntheticData'])->name('providers.synthetic-data.destroy');
+        Route::delete('providers/{apiProvider}', [AdminCatalogController::class, 'destroyApiProvider'])->name('providers.destroy');
+
+        // Provider event history, sync logs, system notification center
+        Route::get('provider-events', [AdminSystemController::class, 'providerEvents'])->name('provider-events.index');
+        Route::get('sync-logs', [AdminSystemController::class, 'syncLogs'])->name('sync-logs.index');
+        Route::get('system-notifications', [AdminSystemController::class, 'systemNotifications'])->name('system-notifications.index');
 
         // Users
         Route::get('users', [AdminCatalogController::class, 'users'])->name('users.index');

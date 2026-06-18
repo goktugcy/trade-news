@@ -8,6 +8,7 @@ use App\Jobs\SendTelegramNotificationJob;
 use App\Models\NewsItem;
 use App\Models\Notification;
 use App\Models\NotificationRule;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -29,14 +30,24 @@ class NotificationDispatcher
      */
     public function dispatchDue(\DateTimeInterface $moment): int
     {
+        $instant = CarbonImmutable::instance(
+            $moment instanceof \DateTimeImmutable ? $moment : \DateTimeImmutable::createFromInterface($moment),
+        );
         $queued = 0;
 
+        // "Due" is evaluated in each user's own timezone, so a daily rule fires
+        // at the user's local midnight, an hourly rule on their local hour, etc.
         NotificationRule::query()
             ->active()
-            ->dueAt($moment)
             ->with('user.telegramIntegration')
-            ->chunkById(200, function ($rules) use (&$queued): void {
+            ->chunkById(200, function ($rules) use (&$queued, $instant): void {
                 foreach ($rules as $rule) {
+                    $timezone = $rule->user?->timezone ?: (string) config('app.timezone', 'UTC');
+
+                    if (! $rule->interval()->isDueAt($instant->setTimezone($timezone))) {
+                        continue;
+                    }
+
                     $queued += $this->processRule($rule);
                 }
             });
@@ -73,6 +84,7 @@ class NotificationDispatcher
 
         $items = NewsItem::query()
             ->where('is_matched', true)
+            ->fromActiveSource()
             ->where('published_at', '>', $since)
             ->where('importance_score', '>=', $rule->min_importance)
             ->when($rule->markets, fn (Builder $q) => $q->whereIn('market', $rule->markets))

@@ -74,11 +74,12 @@ class TelegramBotService
     /**
      * Render the Telegram alert body for a matched news item.
      */
-    public function formatNewsAlert(NewsItem $news): string
+    public function formatNewsAlert(NewsItem $news, ?string $timezone = null): string
     {
+        $timezone ??= (string) config('app.timezone', 'UTC');
         $symbols = $news->stocks->pluck('symbol')->implode(', ');
         $market = $news->market !== null ? $news->market->value : '—';
-        $publishedAt = $news->published_at?->timezone(config('app.timezone'))->format('H:i d.m.Y') ?? '—';
+        $publishedAt = $news->published_at?->timezone($timezone)->format('H:i d.m.Y') ?? '—';
         $source = $news->source !== null ? $news->source->name : 'News Provider';
         $emoji = $news->sentiment?->emoji() ?? '🚨';
 

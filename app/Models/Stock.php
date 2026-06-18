@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\Market;
+use App\Services\Providers\ApiProviderRegistry;
 use Database\Factories\StockFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -31,7 +32,8 @@ class Stock extends Model
 
     protected $fillable = [
         'symbol', 'name', 'market', 'exchange', 'currency',
-        'logo_url', 'sector', 'aliases', 'keywords', 'is_active',
+        'logo_url', 'sector', 'industry', 'market_cap', 'website', 'description',
+        'company_profile', 'profile_synced_at', 'aliases', 'keywords', 'is_active',
     ];
 
     protected function casts(): array
@@ -40,6 +42,9 @@ class Stock extends Model
             'market' => Market::class,
             'aliases' => 'array',
             'keywords' => 'array',
+            'company_profile' => 'array',
+            'market_cap' => 'float',
+            'profile_synced_at' => 'datetime',
             'is_active' => 'boolean',
         ];
     }
@@ -61,13 +66,38 @@ class Stock extends Model
     }
 
     /**
+     * Has this stock had a price stored within the last $minutes? Used to skip
+     * re-fetching symbols that are already fresh.
+     */
+    public function pricedWithin(int $minutes): bool
+    {
+        return $this->prices()
+            ->where('created_at', '>=', now()->subMinutes(max(1, $minutes)))
+            ->exists();
+    }
+
+    /**
+     * Only stocks WITHOUT a price stored in the last $minutes (least-fresh).
+     *
+     * @param  Builder<Stock>  $query
+     */
+    public function scopeStale(Builder $query, int $minutes): void
+    {
+        $query->whereDoesntHave('prices', fn (Builder $q) => $q->where('created_at', '>=', now()->subMinutes(max(1, $minutes))));
+    }
+
+    /**
      * The most recent intraday candle (used for "current price").
      *
      * @return HasOne<StockPrice, $this>
      */
     public function latestPrice(): HasOne
     {
-        return $this->hasOne(StockPrice::class)->latestOfMany('price_at');
+        $hideSynthetic = app(ApiProviderRegistry::class)->shouldHideSyntheticMarketData();
+
+        return $this->hasOne(StockPrice::class)
+            ->withoutSyntheticWhenApiActive($hideSynthetic)
+            ->latestOfMany('price_at');
     }
 
     /**

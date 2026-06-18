@@ -8,6 +8,22 @@ defineProps<{
     marketStatus: MarketStatusInfo[];
     movers: { gainers: StockRow[]; losers: StockRow[] };
 }>();
+
+const dotClass = (color: string): string =>
+    ({
+        emerald: 'bg-emerald-500',
+        amber: 'bg-amber-500',
+        slate: 'bg-slate-400',
+        violet: 'bg-violet-500',
+    })[color] ?? 'bg-slate-400';
+
+const textClass = (color: string): string =>
+    ({
+        emerald: 'text-emerald-600 dark:text-emerald-400',
+        amber: 'text-amber-600 dark:text-amber-400',
+        slate: 'text-muted-foreground',
+        violet: 'text-violet-600 dark:text-violet-400',
+    })[color] ?? 'text-muted-foreground';
 </script>
 
 <template>
@@ -15,23 +31,21 @@ defineProps<{
         <!-- Market status -->
         <section class="rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
             <h2 class="mb-3 text-sm font-semibold text-foreground">Market Status</h2>
-            <ul class="space-y-2">
+            <ul class="space-y-2.5">
                 <li v-for="m in marketStatus" :key="m.market" class="flex items-center justify-between text-sm">
                     <div class="flex items-center gap-2">
-                        <span
-                            class="size-2 rounded-full"
-                            :class="m.is_open ? 'bg-emerald-500' : 'bg-rose-500'"
-                        />
+                        <span class="size-2 rounded-full" :class="dotClass(m.session_color)" />
                         <span class="font-medium text-foreground">{{ m.market }}</span>
                     </div>
-                    <div class="text-right text-xs text-muted-foreground">
-                        <span :class="m.is_open ? 'text-emerald-600 dark:text-emerald-400' : ''">
-                            {{ m.is_open ? 'Open' : 'Closed' }}
-                        </span>
-                        · {{ m.local_time }}
+                    <div class="text-right">
+                        <div class="text-xs font-medium" :class="textClass(m.session_color)">{{ m.session_label }}</div>
+                        <div class="text-[11px] text-muted-foreground">{{ m.opens_at }}–{{ m.closes_at }}</div>
                     </div>
                 </li>
             </ul>
+            <p v-if="marketStatus.length" class="mt-2 text-[11px] text-muted-foreground">
+                Times shown in {{ marketStatus[0].display_timezone }}
+            </p>
         </section>
 
         <!-- Top movers -->

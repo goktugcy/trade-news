@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
 import {
     type CandlestickData,
     CandlestickSeries,
@@ -9,8 +10,9 @@ import {
     type ISeriesApi,
     type UTCTimestamp,
 } from 'lightweight-charts';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Skeleton } from '@/components/ui/skeleton';
+import { candles as stockCandles } from '@/routes/stocks';
 import type { Candle } from '@/types';
 
 const props = defineProps<{
@@ -21,12 +23,14 @@ const props = defineProps<{
 const container = ref<HTMLDivElement | null>(null);
 const loading = ref(true);
 const empty = ref(false);
+const page = usePage();
+const autoRefreshSeconds = computed(() => Number(page.props.dataPreferences?.auto_refresh_seconds ?? 60));
 
 let chart: IChartApi | null = null;
 let candleSeries: ISeriesApi<'Candlestick'> | null = null;
 let volumeSeries: ISeriesApi<'Histogram'> | null = null;
-let resizeObserver: ResizeObserver | null = null;
 let themeObserver: MutationObserver | null = null;
+let refreshTimer: ReturnType<typeof window.setInterval> | null = null;
 
 function isDark(): boolean {
     return document.documentElement.classList.contains('dark');
@@ -85,7 +89,7 @@ async function loadData() {
     empty.value = false;
 
     try {
-        const res = await fetch(`/stocks/${props.symbol}/candles?timeframe=${props.timeframe}`, {
+        const res = await fetch(stockCandles.url(props.symbol, { query: { timeframe: props.timeframe } }), {
             headers: { Accept: 'application/json' },
             credentials: 'same-origin',
         });
@@ -93,6 +97,8 @@ async function loadData() {
         const candles: Candle[] = json.candles ?? [];
 
         if (candles.length === 0) {
+            candleSeries?.setData([]);
+            volumeSeries?.setData([]);
             empty.value = true;
             return;
         }
@@ -115,24 +121,49 @@ async function loadData() {
         volumeSeries?.setData(volumeData);
         chart?.timeScale().fitContent();
     } catch {
+        candleSeries?.setData([]);
+        volumeSeries?.setData([]);
         empty.value = true;
     } finally {
         loading.value = false;
     }
 }
 
+function clearRefreshTimer() {
+    if (refreshTimer !== null) {
+        window.clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+}
+
+function configureRefreshTimer() {
+    clearRefreshTimer();
+
+    if (autoRefreshSeconds.value <= 0) {
+        return;
+    }
+
+    refreshTimer = window.setInterval(() => {
+        if (!loading.value) {
+            loadData();
+        }
+    }, autoRefreshSeconds.value * 1000);
+}
+
 onMounted(() => {
     buildChart();
     loadData();
+    configureRefreshTimer();
 
     themeObserver = new MutationObserver(() => chart?.applyOptions(themeOptions()));
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 });
 
-watch(() => props.timeframe, () => loadData());
+watch(() => [props.symbol, props.timeframe], () => loadData());
+watch(autoRefreshSeconds, () => configureRefreshTimer());
 
 onBeforeUnmount(() => {
-    resizeObserver?.disconnect();
+    clearRefreshTimer();
     themeObserver?.disconnect();
     chart?.remove();
     chart = null;

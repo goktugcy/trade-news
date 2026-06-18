@@ -29,15 +29,15 @@ Artisan::command('tradenews:telegram-set-webhook {url?}', function (TelegramBotS
 | with: php artisan schedule:work  (or a system cron calling schedule:run).
 */
 
-// Prices: every 5 minutes.
-Schedule::command('tradenews:fetch-prices')
-    ->everyFiveMinutes()
+// Prices: checked every minute; provider refresh intervals decide when work is due.
+Schedule::command('tradenews:fetch-prices --random')
+    ->everyMinute()
     ->withoutOverlapping()
     ->onOneServer();
 
-// News: every 5 minutes.
+// News: checked every minute; provider refresh intervals decide when work is due.
 Schedule::command('tradenews:fetch-news')
-    ->everyFiveMinutes()
+    ->everyMinute()
     ->withoutOverlapping()
     ->onOneServer();
 
@@ -53,9 +53,21 @@ Schedule::command('tradenews:dispatch-notifications')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Evaluate user stock alerts (price/volume/news) against the latest quotes.
+Schedule::command('tradenews:evaluate-alerts')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // Provider health probe.
 Schedule::command('tradenews:check-providers')
     ->everyThirtyMinutes()
+    ->onOneServer();
+
+// Market stock universe sync: checked every minute; provider settings decide when each capability is due.
+Schedule::command('tradenews:sync-market-stocks')
+    ->everyMinute()
+    ->withoutOverlapping()
     ->onOneServer();
 
 // Nightly cleanup of stale data + duplicate news.

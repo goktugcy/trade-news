@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\ProviderStatus;
 use App\Models\ApiProvider;
 use App\Models\SystemJob;
+use App\Services\Providers\ProviderHealthService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 
@@ -14,22 +14,25 @@ class CheckProviderHealthCommand extends Command
 {
     protected $signature = 'tradenews:check-providers';
 
-    protected $description = 'Ping each API provider, measure latency, and record status';
+    protected $description = 'Probe each active provider and drive its status state machine';
 
-    public function handle(): int
+    public function handle(ProviderHealthService $health): int
     {
-        SystemJob::track('tradenews:check-providers', function (): void {
-            ApiProvider::query()->where('is_active', true)->get()->each(function (ApiProvider $provider): void {
-                [$status, $latency, $error] = $this->probe($provider);
+        SystemJob::track('tradenews:check-providers', function () use ($health): void {
+            ApiProvider::query()->where('is_active', true)->get()->each(function (ApiProvider $provider) use ($health): void {
+                [$ok, $latency, $error] = $this->probe($provider);
 
-                $provider->update([
-                    'status' => $status,
+                $provider->forceFill([
                     'last_checked_at' => now(),
                     'last_latency_ms' => $latency,
-                    'last_error' => $error,
-                ]);
+                ])->save();
 
-                $this->line("{$provider->key}: {$status->value}".($latency ? " ({$latency}ms)" : ''));
+                // Transitions, event logging and admin notifications happen here.
+                $ok
+                    ? $health->recordSuccess($provider->key, 'health_check')
+                    : $health->recordFailure($provider->key, $error ?? 'unreachable');
+
+                $this->line("{$provider->key}: ".($ok ? 'ok' : 'fail').($latency !== null ? " ({$latency}ms)" : ''));
             });
         });
 
@@ -37,17 +40,16 @@ class CheckProviderHealthCommand extends Command
     }
 
     /**
-     * @return array{0: ProviderStatus, 1: int|null, 2: string|null}
+     * Liveness probe: a reachable host (2xx or 4xx) counts as success; only 5xx
+     * or a connection failure counts as a failed request.
+     *
+     * @return array{0: bool, 1: int|null, 2: string|null}
      */
     private function probe(ApiProvider $provider): array
     {
-        // The synthetic provider is local — always healthy.
-        if ($provider->key === 'synthetic') {
-            return [ProviderStatus::Operational, 0, null];
-        }
-
-        if (! $provider->base_url) {
-            return [ProviderStatus::Unknown, null, 'No base URL configured.'];
+        // Local / non-HTTP providers (synthetic, rss, …) are always reachable.
+        if (str_starts_with($provider->key, 'synthetic') || ! $provider->base_url) {
+            return [true, 0, null];
         }
 
         $start = microtime(true);
@@ -56,15 +58,13 @@ class CheckProviderHealthCommand extends Command
             $response = Http::timeout(8)->get($provider->base_url);
             $latency = (int) round((microtime(true) - $start) * 1000);
 
-            $status = match (true) {
-                $response->successful() => ProviderStatus::Operational,
-                $response->serverError() => ProviderStatus::Down,
-                default => ProviderStatus::Degraded, // 4xx still means the host responds
-            };
+            if ($response->serverError()) {
+                return [false, $latency, "HTTP {$response->status()}"];
+            }
 
-            return [$status, $latency, $response->failed() ? "HTTP {$response->status()}" : null];
+            return [true, $latency, null];
         } catch (\Throwable $e) {
-            return [ProviderStatus::Down, null, mb_substr($e->getMessage(), 0, 500)];
+            return [false, null, mb_substr($e->getMessage(), 0, 500)];
         }
     }
 }

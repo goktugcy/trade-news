@@ -45,7 +45,7 @@ const tabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIST' }, 
 <template>
     <Head title="Stocks" />
 
-    <div class="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 p-4">
+    <div class="mx-auto flex w-full flex-1 flex-col gap-4 p-4">
         <h1 class="text-lg font-semibold text-foreground">Stocks</h1>
 
         <div class="flex flex-col gap-3 rounded-xl border border-sidebar-border/70 bg-card p-3 sm:flex-row sm:items-center dark:border-sidebar-border">

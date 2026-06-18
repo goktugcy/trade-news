@@ -22,8 +22,9 @@ class NewsSourceFactory extends Factory
         return [
             'key' => Str::slug($name).'-'.fake()->unique()->numberBetween(1, 9999),
             'name' => $name,
-            'provider' => 'synthetic',
+            'provider' => 'synthetic-news',
             'market' => fake()->randomElement(['BIST', 'NASDAQ', null]),
+            'feed_url' => fake()->url().'/rss',
             'homepage_url' => fake()->url(),
             'is_active' => true,
         ];

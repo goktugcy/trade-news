@@ -6,14 +6,16 @@ namespace App\Jobs;
 
 use App\Enums\Market;
 use App\Services\News\NewsIngestor;
-use App\Services\News\NewsProviderInterface;
+use App\Services\Providers\ApiProviderRegistry;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 /**
- * Centrally fetches the latest news for a market, dedupes + stores it, then
- * chains sentiment scoring and stock matching for the newly-stored items.
+ * Fetches the latest news from ONE source provider (resolved by key), dedupes +
+ * merges cross-source duplicates, then chains sentiment + stock matching for the
+ * newly-created canonical items. The scheduler fans one job out per active
+ * provider so every source contributes (not just the first that returns data).
  */
 class FetchMarketNewsJob implements ShouldQueue
 {
@@ -23,20 +25,33 @@ class FetchMarketNewsJob implements ShouldQueue
 
     public int $backoff = 30;
 
-    public int $timeout = 90;
+    public int $timeout = 120;
 
-    public function __construct(public ?Market $market = null) {}
+    public function __construct(
+        public string $providerKey,
+        public ?Market $market = null,
+        public int $limit = 50,
+    ) {}
 
-    public function handle(NewsProviderInterface $provider): void
+    public function handle(ApiProviderRegistry $registry): void
     {
-        $created = (new NewsIngestor($provider))->ingest($this->market);
+        $provider = $registry->makeNewsProviderByKey($this->providerKey);
+
+        if ($provider === null) {
+            return;
+        }
+
+        $created = (new NewsIngestor($provider))->ingest($this->market, $this->limit);
 
         if ($created->isEmpty()) {
             return;
         }
 
-        // Score sentiment first, then match to stocks (both idempotent).
-        CalculateNewsSentimentJob::dispatch($created->pluck('id')->all());
-        MatchNewsWithStocksJob::dispatch($created->pluck('id')->all());
+        $ids = $created->pluck('id')->all();
+
+        // Score sentiment + match stocks + generate AI summaries (all idempotent).
+        CalculateNewsSentimentJob::dispatch($ids);
+        MatchNewsWithStocksJob::dispatch($ids);
+        GenerateNewsSummaryJob::dispatch($ids);
     }
 }

@@ -69,7 +69,7 @@ function badgeClass(status: string): string {
 <template>
     <Head title="Admin · Overview" />
 
-    <div class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4">
+    <div class="mx-auto flex w-full flex-1 flex-col gap-4 p-4">
         <AdminNav />
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

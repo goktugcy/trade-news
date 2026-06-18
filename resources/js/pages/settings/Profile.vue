@@ -23,6 +23,8 @@ defineOptions({
     },
 });
 
+defineProps<{ timezones: string[] }>();
+
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 </script>
@@ -36,7 +38,7 @@ const user = computed(() => page.props.auth.user);
         <Heading
             variant="small"
             title="Profile"
-            description="Update your name and email address"
+            description="Update your name, email address and timezone"
         />
 
         <Form
@@ -71,6 +73,23 @@ const user = computed(() => page.props.auth.user);
                     placeholder="Email address"
                 />
                 <InputError class="mt-2" :message="errors.email" />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="timezone">Timezone</Label>
+                <select
+                    id="timezone"
+                    name="timezone"
+                    :value="user.timezone ?? 'Europe/Istanbul'"
+                    required
+                    class="mt-1 block h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+                >
+                    <option v-for="tz in timezones" :key="tz" :value="tz">{{ tz }}</option>
+                </select>
+                <p class="text-xs text-muted-foreground">
+                    All news, market hours, charts and alerts are shown in this timezone.
+                </p>
+                <InputError class="mt-2" :message="errors.timezone" />
             </div>
 
             <div v-if="page.props.mustVerifyEmail && !user.email_verified_at">

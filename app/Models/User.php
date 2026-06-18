@@ -31,6 +31,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read UserDataPreference|null $dataPreference
  */
 #[Fillable(['name', 'email', 'password', 'is_admin', 'timezone'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
@@ -88,6 +89,14 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * @return HasOne<UserDataPreference, $this>
+     */
+    public function dataPreference(): HasOne
+    {
+        return $this->hasOne(UserDataPreference::class);
+    }
+
+    /**
      * @return HasMany<NotificationRule, $this>
      */
     public function notificationRules(): HasMany
@@ -104,5 +113,25 @@ class User extends Authenticatable implements PasskeyUser
     public function alertLogs(): HasMany
     {
         return $this->hasMany(Notification::class);
+    }
+
+    /**
+     * In-app notification inbox.
+     *
+     * @return HasMany<UserNotification, $this>
+     */
+    public function userNotifications(): HasMany
+    {
+        return $this->hasMany(UserNotification::class)->latest('id');
+    }
+
+    /**
+     * Condition-based stock alerts (price/volume/news).
+     *
+     * @return HasMany<StockAlert, $this>
+     */
+    public function stockAlerts(): HasMany
+    {
+        return $this->hasMany(StockAlert::class)->latest('id');
     }
 }
