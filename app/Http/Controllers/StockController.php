@@ -22,6 +22,23 @@ use Inertia\Response;
 
 class StockController extends Controller
 {
+    private const string DEFAULT_CHART_RANGE = 'latest';
+
+    /**
+     * @var array<string, array{label: string, limit: int}>
+     */
+    private const array CHART_RANGES = [
+        'latest' => ['label' => 'Latest', 'limit' => 300],
+        '1h' => ['label' => '1H', 'limit' => 300],
+        '3h' => ['label' => '3H', 'limit' => 300],
+        '24h' => ['label' => '24H', 'limit' => 500],
+        '1mo' => ['label' => '1M', 'limit' => 900],
+        '3mo' => ['label' => '3M', 'limit' => 1_200],
+        '5mo' => ['label' => '5M', 'limit' => 1_500],
+        '1y' => ['label' => '1Y', 'limit' => 800],
+        '5y' => ['label' => '5Y', 'limit' => 2_000],
+    ];
+
     /**
      * Searchable stock list grouped by market.
      */
@@ -83,6 +100,7 @@ class StockController extends Controller
                 'value' => $t->value,
                 'label' => $t->label(),
             ], Timeframe::cases()),
+            'chartRanges' => $this->chartRangeOptions(),
         ]);
     }
 
@@ -92,14 +110,17 @@ class StockController extends Controller
     public function candles(Request $request, Stock $stock, ApiProviderRegistry $providers): JsonResponse
     {
         $timeframe = Timeframe::tryFrom($request->string('timeframe')->toString()) ?? Timeframe::FiveMinutes;
+        $range = $this->normalizeChartRange($request->string('range')->toString());
+        $rangeStart = $this->chartRangeStart($range);
         $apiActive = $providers->hasActiveRealProvider(ProviderType::MarketData);
         $hideSynthetic = $providers->shouldHideSyntheticMarketData();
 
         $candles = $stock->prices()
             ->timeframe($timeframe)
             ->withoutSyntheticWhenApiActive($hideSynthetic)
+            ->when($rangeStart instanceof CarbonImmutable, fn (Builder $q) => $q->where('price_at', '>=', $rangeStart))
             ->latest('price_at')
-            ->limit(300)
+            ->limit(self::CHART_RANGES[$range]['limit'])
             ->get(['open', 'high', 'low', 'close', 'volume', 'price_at', 'provider_key', 'source_kind'])
             ->sortBy('price_at')
             ->values()
@@ -109,6 +130,7 @@ class StockController extends Controller
         return response()->json([
             'symbol' => $stock->symbol,
             'timeframe' => $timeframe->value,
+            'range' => $range,
             'candles' => $this->withCachedQuoteCandle($candles, $stock, $timeframe, $hideSynthetic),
             'source' => [
                 'mode' => $apiActive ? 'api' : 'development',
@@ -215,5 +237,45 @@ class StockController extends Controller
     private function bucketTime(CarbonImmutable $at, Timeframe $timeframe): int
     {
         return intdiv($at->getTimestamp(), $timeframe->seconds()) * $timeframe->seconds();
+    }
+
+    /**
+     * @return array<int, array{value: string, label: string}>
+     */
+    private function chartRangeOptions(): array
+    {
+        return collect(self::CHART_RANGES)
+            ->map(fn (array $range, string $value): array => [
+                'value' => $value,
+                'label' => $range['label'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function normalizeChartRange(string $range): string
+    {
+        if (array_key_exists($range, self::CHART_RANGES)) {
+            return $range;
+        }
+
+        return self::DEFAULT_CHART_RANGE;
+    }
+
+    private function chartRangeStart(string $range): ?CarbonImmutable
+    {
+        $now = CarbonImmutable::now();
+
+        return match ($range) {
+            '1h' => $now->subHour(),
+            '3h' => $now->subHours(3),
+            '24h' => $now->subDay(),
+            '1mo' => $now->subMonth(),
+            '3mo' => $now->subMonths(3),
+            '5mo' => $now->subMonths(5),
+            '1y' => $now->subYear(),
+            '5y' => $now->subYears(5),
+            default => null,
+        };
     }
 }

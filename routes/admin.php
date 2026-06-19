@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\AdminCatalogController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminStockController;
+use App\Http\Controllers\Admin\AdminStockHistoricalPriceController;
+use App\Http\Controllers\Admin\AdminStooqHistoricalPriceController;
 use App\Http\Controllers\Admin\AdminSystemController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,8 +17,10 @@ Route::middleware(['auth', 'verified', 'admin'])
         // Stocks (full CRUD)
         Route::get('stocks', [AdminStockController::class, 'index'])->name('stocks.index');
         Route::post('stocks', [AdminStockController::class, 'store'])->name('stocks.store');
-        Route::put('stocks/{stock}', [AdminStockController::class, 'update'])->name('stocks.update');
-        Route::delete('stocks/{stock}', [AdminStockController::class, 'destroy'])->name('stocks.destroy');
+        Route::post('stocks/historical-prices/stooq', [AdminStooqHistoricalPriceController::class, 'store'])->name('stocks.historical-prices.stooq');
+        Route::post('stocks/{stock:id}/historical-prices', [AdminStockHistoricalPriceController::class, 'store'])->name('stocks.historical-prices.store');
+        Route::put('stocks/{stock:id}', [AdminStockController::class, 'update'])->name('stocks.update');
+        Route::delete('stocks/{stock:id}', [AdminStockController::class, 'destroy'])->name('stocks.destroy');
 
         // News sources
         Route::get('news-sources', [AdminCatalogController::class, 'newsSources'])->name('news-sources.index');

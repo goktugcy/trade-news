@@ -39,6 +39,12 @@ class StockPrice extends Model
 
     public const SOURCE_SYNTHETIC = 'synthetic';
 
+    public const PROVIDER_MANUAL_CSV = 'manual-csv';
+
+    public const PROVIDER_BULK_CSV = 'bulk-csv';
+
+    public const PROVIDER_STOOQ_UPLOAD = 'stooq-upload';
+
     protected $fillable = [
         'stock_id', 'timeframe', 'provider_key', 'source_kind',
         'open', 'high', 'low', 'close', 'volume', 'price_at',

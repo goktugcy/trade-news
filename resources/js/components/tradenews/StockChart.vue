@@ -18,6 +18,7 @@ import type { Candle } from '@/types';
 const props = defineProps<{
     symbol: string;
     timeframe: string;
+    range: string;
 }>();
 
 const container = ref<HTMLDivElement | null>(null);
@@ -89,7 +90,7 @@ async function loadData() {
     empty.value = false;
 
     try {
-        const res = await fetch(stockCandles.url(props.symbol, { query: { timeframe: props.timeframe } }), {
+        const res = await fetch(stockCandles.url(props.symbol, { query: { timeframe: props.timeframe, range: props.range } }), {
             headers: { Accept: 'application/json' },
             credentials: 'same-origin',
         });
@@ -159,7 +160,7 @@ onMounted(() => {
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 });
 
-watch(() => [props.symbol, props.timeframe], () => loadData());
+watch(() => [props.symbol, props.timeframe, props.range], () => loadData());
 watch(autoRefreshSeconds, () => configureRefreshTimer());
 
 onBeforeUnmount(() => {

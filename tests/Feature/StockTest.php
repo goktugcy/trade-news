@@ -38,7 +38,8 @@ it('shows a stock detail page bound by symbol', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('stocks/Show')
-            ->where('stock.symbol', 'AAPL'));
+            ->where('stock.symbol', 'AAPL')
+            ->has('chartRanges'));
 });
 
 it('returns candle JSON for the chart', function () {
@@ -146,6 +147,39 @@ it('returns the latest 300 chart candles in ascending time order', function () {
 
     expect($candles[0]['time'])->toBe($base->addMinutes(25)->getTimestamp())
         ->and($candles[299]['time'])->toBe($base->addMinutes(1_520)->getTimestamp());
+});
+
+it('returns expanded daily candle ranges for yearly chart selections', function () {
+    $this->travelTo(CarbonImmutable::create(2026, 6, 19, 16));
+
+    $user = User::factory()->create();
+    $stock = Stock::factory()->create(['symbol' => 'AAPL']);
+    $now = CarbonImmutable::now();
+
+    StockPrice::factory()->create([
+        'stock_id' => $stock->id,
+        'timeframe' => Timeframe::OneDay,
+        'price_at' => $now->subDays(370),
+    ]);
+
+    for ($i = 364; $i >= 0; $i--) {
+        StockPrice::factory()->create([
+            'stock_id' => $stock->id,
+            'timeframe' => Timeframe::OneDay,
+            'price_at' => $now->subDays($i),
+        ]);
+    }
+
+    $response = $this->actingAs($user)
+        ->getJson('/stocks/AAPL/candles?timeframe=1d&range=1y')
+        ->assertOk()
+        ->assertJsonPath('range', '1y')
+        ->assertJsonCount(365, 'candles');
+
+    $candles = $response->json('candles');
+
+    expect($candles[0]['time'])->toBe($now->subDays(364)->getTimestamp())
+        ->and($candles[364]['time'])->toBe($now->getTimestamp());
 });
 
 it('includes a cached quote candle in chart JSON', function () {

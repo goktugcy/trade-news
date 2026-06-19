@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\Market;
+use App\Enums\Timeframe;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreStockRequest;
 use App\Models\Stock;
@@ -41,7 +42,13 @@ class AdminStockController extends Controller
         return Inertia::render('admin/Stocks', [
             'stocks' => $stocks,
             'filters' => ['q' => $search ?: null],
-            'options' => ['markets' => Market::options()],
+            'options' => [
+                'markets' => Market::options(),
+                'timeframes' => array_map(fn (Timeframe $timeframe) => [
+                    'value' => $timeframe->value,
+                    'label' => $timeframe->label(),
+                ], Timeframe::cases()),
+            ],
         ]);
     }
 
