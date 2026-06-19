@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Search } from '@lucide/vue';
+import { Search, SlidersHorizontal } from '@lucide/vue';
 import { ref, watch } from 'vue';
 import EmptyState from '@/components/tradenews/EmptyState.vue';
 import NewsFeed from '@/components/tradenews/NewsFeed.vue';
+import NewsSourcePicker from '@/components/tradenews/NewsSourcePicker.vue';
 import { Input } from '@/components/ui/input';
-import type { PaginatedNews, SelectOption } from '@/types';
+import type { NewsSourcePref, PaginatedNews, SelectOption } from '@/types';
 
 const props = defineProps<{
     news: PaginatedNews;
     filters: { market: string; sentiment: string | null; q: string | null };
     options: { markets: SelectOption[]; sentiments: Array<{ value: string; label: string; color: string }> };
-    scope: 'all' | 'watchlist';
+    scope: 'all' | 'watchlist' | 'saved';
     watchlistEmpty?: boolean;
+    sources?: NewsSourcePref[];
 }>();
+
+const showSources = ref(false);
 
 defineOptions({
     layout: { breadcrumbs: [{ title: 'News', href: '/news' }] },
@@ -69,6 +73,16 @@ const marketTabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIS
                         </button>
                     </div>
 
+                    <button
+                        v-if="sources"
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+                        :class="showSources ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'"
+                        @click="showSources = !showSources"
+                    >
+                        <SlidersHorizontal class="size-3.5" /> Sources
+                    </button>
+
                     <div class="ml-auto flex items-center gap-1.5">
                         <button
                             type="button"
@@ -95,6 +109,8 @@ const marketTabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIS
                     <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input v-model="search" placeholder="Search headlines or symbols…" class="pl-9" />
                 </div>
+
+                <NewsSourcePicker v-if="sources && showSources" :sources="sources" />
             </div>
         </div>
 

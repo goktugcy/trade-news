@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -37,6 +38,10 @@ use Illuminate\Support\Carbon;
  * @property-read NewsSource|null $source
  * @property-read Collection<int, Stock> $stocks
  * @property-read Collection<int, NewsItemSource> $sources
+ * @property-read NewsItemReaction|null $reactionForUser
+ * @property-read SavedNewsItem|null $savedForUser
+ * @property-read int|null $likes_count
+ * @property-read int|null $dislikes_count
  */
 class NewsItem extends Model
 {
@@ -106,6 +111,42 @@ class NewsItem extends Model
     {
         return $this->belongsToMany(Stock::class, 'news_stock_matches')
             ->withPivot(['match_type', 'matched_term', 'confidence', 'created_at']);
+    }
+
+    /**
+     * The current user's reaction — scope to the user via the eager-load closure.
+     *
+     * @return HasOne<NewsItemReaction, $this>
+     */
+    public function reactionForUser(): HasOne
+    {
+        return $this->hasOne(NewsItemReaction::class);
+    }
+
+    /**
+     * The current user's saved row — scope to the user via the eager-load closure.
+     *
+     * @return HasOne<SavedNewsItem, $this>
+     */
+    public function savedForUser(): HasOne
+    {
+        return $this->hasOne(SavedNewsItem::class);
+    }
+
+    /**
+     * @return HasMany<NewsItemReaction, $this>
+     */
+    public function likes(): HasMany
+    {
+        return $this->hasMany(NewsItemReaction::class)->where('value', NewsItemReaction::LIKE);
+    }
+
+    /**
+     * @return HasMany<NewsItemReaction, $this>
+     */
+    public function dislikes(): HasMany
+    {
+        return $this->hasMany(NewsItemReaction::class)->where('value', NewsItemReaction::DISLIKE);
     }
 
     /** @param  Builder<NewsItem>  $query */

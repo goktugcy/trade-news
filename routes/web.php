@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NewsController;
+use App\Http\Controllers\NewsInteractionController;
+use App\Http\Controllers\NewsSourcePreferenceController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationRuleController;
 use App\Http\Controllers\StockAlertController;
@@ -28,9 +30,14 @@ Route::post('telegram/webhook/{secret}', TelegramWebhookController::class)
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
-    // News feeds
+    // News feeds (static routes before the {newsItem} wildcard)
     Route::get('news', [NewsController::class, 'index'])->name('news.index');
     Route::get('news/watchlist', [NewsController::class, 'watchlist'])->name('news.watchlist');
+    Route::get('news/saved', [NewsController::class, 'saved'])->name('news.saved');
+    Route::patch('news/sources/{newsSource}', [NewsSourcePreferenceController::class, 'update'])->name('news.sources.update');
+    Route::post('news/{newsItem}/react', [NewsInteractionController::class, 'react'])->name('news.react');
+    Route::post('news/{newsItem}/save', [NewsInteractionController::class, 'save'])->name('news.save');
+    Route::delete('news/{newsItem}/save', [NewsInteractionController::class, 'unsave'])->name('news.unsave');
 
     // Stocks (specific routes before the {stock} wildcard)
     Route::get('stocks', [StockController::class, 'index'])->name('stocks.index');

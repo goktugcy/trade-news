@@ -81,10 +81,22 @@ class StockController extends Controller
             ->where('stock_id', $stock->id)
             ->first();
 
+        $uid = $request->user()->id;
+        $disabledSourceIds = $request->user()->disabledNewsSources()->pluck('news_source_id');
+
         $relatedNews = $stock->news()
             ->where('is_matched', true)
             ->whereHas('source', fn (Builder $q) => $q->where('is_active', true))
-            ->with(['stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name'])
+            ->with([
+                'stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name',
+                'reactionForUser' => fn ($q) => $q->where('user_id', $uid),
+                'savedForUser' => fn ($q) => $q->where('user_id', $uid),
+            ])
+            ->withCount(['likes', 'dislikes'])
+            ->when(
+                $disabledSourceIds->isNotEmpty(),
+                fn (Builder $q) => $q->whereNotIn('source_id', $disabledSourceIds),
+            )
             ->orderByDesc('published_at')
             ->limit(20)
             ->get();

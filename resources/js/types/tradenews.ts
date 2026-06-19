@@ -24,6 +24,17 @@ export type NewsCardData = {
     source_count: number;
     sources: { name: string | null; url: string | null }[];
     stocks: StockRef[];
+    reaction: 1 | -1 | null;
+    is_saved: boolean;
+    like_count: number;
+    dislike_count: number;
+};
+
+export type NewsSourcePref = {
+    id: number;
+    name: string;
+    language: string | null;
+    enabled: boolean;
 };
 
 export type StockRow = {

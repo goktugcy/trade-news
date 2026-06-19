@@ -45,6 +45,7 @@ class AdminCatalogController extends Controller
                     'name' => $s->name,
                     'provider' => $s->provider,
                     'market' => $s->market,
+                    'language' => $s->language,
                     'feed_url' => $s->feed_url ?: ($configuredFeeds[$s->key]['url'] ?? null),
                     'homepage_url' => $s->homepage_url ?: ($configuredFeeds[$s->key]['homepage_url'] ?? null),
                     'is_active' => $s->is_active,
@@ -118,6 +119,7 @@ class AdminCatalogController extends Controller
             'feed_url' => ['required', 'url', 'max:1024'],
             'homepage_url' => ['nullable', 'url', 'max:255'],
             'market' => ['nullable', Rule::in([Market::BIST->value, Market::NASDAQ->value])],
+            'language' => ['nullable', 'string', 'max:8'],
             'is_active' => ['boolean'],
         ]);
 
@@ -126,6 +128,8 @@ class AdminCatalogController extends Controller
         if ($validated['market'] === '') {
             $validated['market'] = null;
         }
+
+        $validated['language'] = ($validated['language'] ?? null) ?: null;
 
         $validated['is_active'] = $request->has('is_active')
             ? $request->boolean('is_active')

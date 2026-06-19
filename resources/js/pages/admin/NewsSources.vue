@@ -19,6 +19,7 @@ type Source = {
     name: string;
     provider: string | null;
     market: string | null;
+    language: string | null;
     feed_url: string | null;
     homepage_url: string | null;
     is_active: boolean;
@@ -37,6 +38,7 @@ type RssSourceForm = {
     feed_url: string;
     homepage_url: string;
     market: string | null;
+    language: string | null;
     is_active: boolean;
 };
 
@@ -57,8 +59,15 @@ const form = useForm<RssSourceForm>({
     feed_url: '',
     homepage_url: '',
     market: null,
+    language: null,
     is_active: true,
 });
+
+const languageOptions = [
+    { value: null, label: '—' },
+    { value: 'tr', label: 'Turkish (tr)' },
+    { value: 'en', label: 'English (en)' },
+];
 
 const isEditing = computed(() => editingId.value !== null);
 
@@ -70,6 +79,7 @@ function resetForm() {
     form.feed_url = '';
     form.homepage_url = '';
     form.market = null;
+    form.language = null;
     form.is_active = true;
 }
 
@@ -85,6 +95,7 @@ function edit(source: Source) {
     form.feed_url = source.feed_url ?? '';
     form.homepage_url = source.homepage_url ?? '';
     form.market = source.market;
+    form.language = source.language;
     form.is_active = source.is_active;
 }
 
@@ -170,6 +181,19 @@ function scopeLabel(market: string | null) {
                     <p v-if="form.errors.market" class="text-xs text-destructive">{{ form.errors.market }}</p>
                 </div>
 
+                <div class="space-y-1.5">
+                    <Label for="news-source-language">Language</Label>
+                    <select
+                        id="news-source-language"
+                        v-model="form.language"
+                        class="border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] dark:bg-input/30"
+                        :aria-invalid="Boolean(form.errors.language)"
+                    >
+                        <option v-for="option in languageOptions" :key="option.label" :value="option.value">{{ option.label }}</option>
+                    </select>
+                    <p v-if="form.errors.language" class="text-xs text-destructive">{{ form.errors.language }}</p>
+                </div>
+
                 <div class="flex items-end justify-between gap-3">
                     <label class="inline-flex h-9 items-center gap-2 text-sm font-medium text-foreground">
                         <input v-model="form.is_active" type="checkbox" class="size-4 rounded border-input accent-primary" />
@@ -193,6 +217,7 @@ function scopeLabel(market: string | null) {
                             <th class="px-4 py-2 font-medium">Key</th>
                             <th class="px-4 py-2 font-medium">Provider</th>
                             <th class="px-4 py-2 font-medium">Scope</th>
+                            <th class="px-4 py-2 font-medium">Lang</th>
                             <th class="px-4 py-2 font-medium">Feed URL</th>
                             <th class="px-4 py-2 font-medium">Homepage</th>
                             <th class="px-4 py-2 text-right font-medium">Items</th>
@@ -208,6 +233,7 @@ function scopeLabel(market: string | null) {
                             <td class="px-4 py-2 font-mono text-xs text-muted-foreground">{{ source.key }}</td>
                             <td class="px-4 py-2 text-muted-foreground">{{ source.provider ?? '—' }}</td>
                             <td class="px-4 py-2 text-muted-foreground">{{ scopeLabel(source.market) }}</td>
+                            <td class="px-4 py-2 uppercase text-muted-foreground">{{ source.language ?? '—' }}</td>
                             <td class="max-w-[18rem] px-4 py-2">
                                 <a
                                     v-if="source.feed_url"
@@ -271,7 +297,7 @@ function scopeLabel(market: string | null) {
                             </td>
                         </tr>
                         <tr v-if="sources.length === 0">
-                            <td colspan="8" class="px-4 py-8 text-center text-sm text-muted-foreground">No news sources configured.</td>
+                            <td colspan="9" class="px-4 py-8 text-center text-sm text-muted-foreground">No news sources configured.</td>
                         </tr>
                     </tbody>
                 </table>

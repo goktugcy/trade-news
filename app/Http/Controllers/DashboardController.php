@@ -21,12 +21,22 @@ class DashboardController extends Controller
         $user = $request->user();
 
         $watchlistStockIds = $user->watchlist()->pluck('stock_id');
+        $disabledSourceIds = $user->disabledNewsSources()->pluck('news_source_id');
 
         $feed = NewsItem::query()
             ->where('is_matched', true)
             ->fromActiveSource()
             ->published()
-            ->with(['stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name'])
+            ->with([
+                'stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name',
+                'reactionForUser' => fn ($q) => $q->where('user_id', $user->id),
+                'savedForUser' => fn ($q) => $q->where('user_id', $user->id),
+            ])
+            ->withCount(['likes', 'dislikes'])
+            ->when(
+                $disabledSourceIds->isNotEmpty(),
+                fn ($q) => $q->whereNotIn('source_id', $disabledSourceIds),
+            )
             ->limit(12)
             ->get();
 

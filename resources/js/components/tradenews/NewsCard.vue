@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { ExternalLink, Flame } from '@lucide/vue';
+import NewsCardActions from '@/components/tradenews/NewsCardActions.vue';
 import SentimentBadge from '@/components/tradenews/SentimentBadge.vue';
 import { useUserTimezone } from '@/composables/useUserTimezone';
 import type { NewsCardData } from '@/types';
@@ -98,6 +99,10 @@ const { relative, dateTime } = useUserTimezone();
                     >
                         Read <ExternalLink class="size-3" />
                     </a>
+                </div>
+
+                <div class="mt-3 flex items-center justify-between border-t border-sidebar-border/60 pt-2.5 dark:border-sidebar-border">
+                    <NewsCardActions :news="news" />
                 </div>
             </div>
         </div>

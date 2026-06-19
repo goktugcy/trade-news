@@ -15,6 +15,7 @@ it('lets an admin create and update RSS news sources', function () {
         'feed_url' => 'https://feeds.test/rss.xml',
         'homepage_url' => 'https://feeds.test',
         'market' => null,
+        'language' => 'tr',
         'is_active' => true,
     ])->assertRedirect();
 
@@ -23,6 +24,7 @@ it('lets an admin create and update RSS news sources', function () {
     expect($source->provider)->toBe('rss')
         ->and($source->feed_url)->toBe('https://feeds.test/rss.xml')
         ->and($source->market)->toBeNull()
+        ->and($source->language)->toBe('tr')
         ->and($source->is_active)->toBeTrue();
 
     $this->actingAs($admin)->put("/admin/news-sources/{$source->id}", [
@@ -31,6 +33,7 @@ it('lets an admin create and update RSS news sources', function () {
         'feed_url' => 'https://feeds.test/updated.xml',
         'homepage_url' => null,
         'market' => 'NASDAQ',
+        'language' => 'en',
         'is_active' => false,
     ])->assertRedirect();
 
@@ -40,6 +43,7 @@ it('lets an admin create and update RSS news sources', function () {
         ->and($source->feed_url)->toBe('https://feeds.test/updated.xml')
         ->and($source->homepage_url)->toBeNull()
         ->and($source->market)->toBe('NASDAQ')
+        ->and($source->language)->toBe('en')
         ->and($source->is_active)->toBeFalse();
 });
 

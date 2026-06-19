@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // A row exists only when a user has DISABLED a source for their feed
+        // (default opt-out: no row → source visible).
+        Schema::create('user_news_source_preferences', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('news_source_id')->constrained('news_sources')->cascadeOnDelete();
+            $table->timestamps();
+
+            $table->unique(['user_id', 'news_source_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('user_news_source_preferences');
+    }
+};

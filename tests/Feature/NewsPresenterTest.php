@@ -22,3 +22,14 @@ it('keeps image URL and published timestamp in the news card payload', function 
         ->and($payload['source'])->toBe('RSS Wire')
         ->and($payload)->toHaveKeys(['image_url', 'published_at', 'published_for_humans']);
 });
+
+it('defaults interaction state when relations are not eager-loaded', function () {
+    $news = NewsItem::factory()->create();
+
+    $payload = NewsPresenter::card($news);
+
+    expect($payload['reaction'])->toBeNull()
+        ->and($payload['is_saved'])->toBeFalse()
+        ->and($payload['like_count'])->toBe(0)
+        ->and($payload['dislike_count'])->toBe(0);
+});

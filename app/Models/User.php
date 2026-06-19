@@ -134,4 +134,34 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->hasMany(StockAlert::class)->latest('id');
     }
+
+    /**
+     * This user's like/dislike reactions on news items.
+     *
+     * @return HasMany<NewsItemReaction, $this>
+     */
+    public function newsReactions(): HasMany
+    {
+        return $this->hasMany(NewsItemReaction::class);
+    }
+
+    /**
+     * News items this user has saved, newest first.
+     *
+     * @return HasMany<SavedNewsItem, $this>
+     */
+    public function savedNews(): HasMany
+    {
+        return $this->hasMany(SavedNewsItem::class)->latest('id');
+    }
+
+    /**
+     * News sources this user has disabled for their feed (default opt-out).
+     *
+     * @return HasMany<UserNewsSourcePreference, $this>
+     */
+    public function disabledNewsSources(): HasMany
+    {
+        return $this->hasMany(UserNewsSourcePreference::class);
+    }
 }

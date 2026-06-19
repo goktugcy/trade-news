@@ -24,6 +24,7 @@ class NewsSourceFactory extends Factory
             'name' => $name,
             'provider' => 'synthetic-news',
             'market' => fake()->randomElement(['BIST', 'NASDAQ', null]),
+            'language' => fake()->randomElement(['tr', 'en']),
             'feed_url' => fake()->url().'/rss',
             'homepage_url' => fake()->url(),
             'is_active' => true,

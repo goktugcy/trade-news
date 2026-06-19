@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\Market;
 use App\Enums\Sentiment;
 use App\Models\NewsItem;
+use App\Models\NewsSource;
 use App\Support\Presenters\NewsPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class NewsController extends Controller
             'filters' => $this->filters($request),
             'options' => $this->filterOptions(),
             'scope' => 'all',
+            'sources' => $this->sourceOptions($request),
         ]);
     }
 
@@ -44,6 +46,25 @@ class NewsController extends Controller
             'options' => $this->filterOptions(),
             'scope' => 'watchlist',
             'watchlistEmpty' => $stockIds->isEmpty(),
+            'sources' => $this->sourceOptions($request),
+        ]);
+    }
+
+    /**
+     * The "Saved News" feed — only news the user has bookmarked.
+     */
+    public function saved(Request $request): Response
+    {
+        $uid = $request->user()->id;
+
+        $query = $this->baseQuery($request)
+            ->whereHas('savedForUser', fn (Builder $q) => $q->where('user_id', $uid));
+
+        return Inertia::render('news/Saved', [
+            'news' => $this->paginate($query),
+            'filters' => $this->filters($request),
+            'options' => $this->filterOptions(),
+            'scope' => 'saved',
         ]);
     }
 
@@ -55,12 +76,23 @@ class NewsController extends Controller
         $market = $request->string('market')->upper()->toString();
         $sentiment = $request->string('sentiment')->lower()->toString();
         $search = trim($request->string('q')->toString());
+        $uid = $request->user()->id;
+        $disabled = $request->user()->disabledNewsSources()->pluck('news_source_id');
 
         return NewsItem::query()
             ->where('is_matched', true)
             ->fromActiveSource()
             ->published()
-            ->with(['stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name'])
+            ->with([
+                'stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name',
+                'reactionForUser' => fn ($q) => $q->where('user_id', $uid),
+                'savedForUser' => fn ($q) => $q->where('user_id', $uid),
+            ])
+            ->withCount(['likes', 'dislikes'])
+            ->when(
+                $disabled->isNotEmpty(),
+                fn (Builder $q) => $q->whereNotIn('source_id', $disabled),
+            )
             ->when(
                 in_array($market, [Market::BIST->value, Market::NASDAQ->value], true),
                 fn (Builder $q) => $q->where('market', $market),
@@ -123,5 +155,27 @@ class NewsController extends Controller
                 'color' => $s->color(),
             ], Sentiment::cases()),
         ];
+    }
+
+    /**
+     * Active sources with the user's per-source enabled state (default opt-out).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function sourceOptions(Request $request): array
+    {
+        $disabled = $request->user()->disabledNewsSources()->pluck('news_source_id');
+
+        return NewsSource::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'language'])
+            ->map(fn (NewsSource $source) => [
+                'id' => $source->id,
+                'name' => $source->name,
+                'language' => $source->language,
+                'enabled' => ! $disabled->contains($source->id),
+            ])
+            ->all();
     }
 }

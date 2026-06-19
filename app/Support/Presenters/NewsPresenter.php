@@ -31,6 +31,11 @@ class NewsPresenter
             'published_for_humans' => $item->published_at?->diffForHumans(),
             'source' => $item->relationLoaded('source') ? $item->source?->name : null,
             'source_count' => $item->source_count,
+            // Per-user interaction state (present only when eager-loaded for the current user).
+            'reaction' => $item->relationLoaded('reactionForUser') ? $item->reactionForUser?->value : null,
+            'is_saved' => $item->relationLoaded('savedForUser') ? $item->savedForUser !== null : false,
+            'like_count' => $item->likes_count ?? 0,
+            'dislike_count' => $item->dislikes_count ?? 0,
             // Every original outlet this (possibly merged) story came from.
             'sources' => $item->relationLoaded('sources')
                 ? $item->sources->map(fn ($s) => [
