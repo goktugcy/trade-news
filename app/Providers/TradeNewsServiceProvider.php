@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Enums\ProviderType;
+use App\Models\AiSetting;
 use App\Models\ApiProvider;
 use App\Models\User;
+use App\Services\Ai\AiProviderClientFactory;
 use App\Services\MarketData\FallbackMarketDataProvider;
 use App\Services\MarketData\FinnhubProvider;
 use App\Services\MarketData\MarketDataProviderInterface;
 use App\Services\MarketData\SyntheticMarketDataProvider;
 use App\Services\MarketData\TwelveDataProvider;
+use App\Services\News\AiSummarizer;
 use App\Services\News\AiSummarizerInterface;
 use App\Services\News\FallbackNewsProvider;
 use App\Services\News\FinnhubNewsProvider;
@@ -72,9 +75,36 @@ class TradeNewsServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->singleton(AiProviderClientFactory::class);
+
         // AI summaries are optional: with an OpenAI key we use it, otherwise a
         // null summarizer keeps the pipeline working with the original summary.
         $this->app->singleton(AiSummarizerInterface::class, function (): AiSummarizerInterface {
+            $setting = AiSetting::query()->with(['activeModel.provider'])->first();
+
+            if ($setting instanceof AiSetting) {
+                $model = $setting->activeModel;
+                $provider = $model?->provider;
+
+                if (
+                    ! $setting->enabled
+                    || $model === null
+                    || ! $model->is_active
+                    || $provider === null
+                    || ! $provider->is_active
+                    || ! $provider->hasApiKey()
+                    || ! $provider->status->isHealthy()
+                ) {
+                    return new NullSummarizer;
+                }
+
+                $client = app(AiProviderClientFactory::class)->make($provider);
+
+                return $client === null
+                    ? new NullSummarizer
+                    : new AiSummarizer($client, $model);
+            }
+
             $key = config('tradenews.ai.key');
 
             if (empty($key) || config('tradenews.ai.provider') !== 'openai') {

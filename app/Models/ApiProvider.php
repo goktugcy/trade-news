@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\ProviderStatus;
 use App\Enums\ProviderType;
 use Database\Factories\ApiProviderFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -35,6 +36,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $last_latency_ms
  * @property string|null $last_error
  * @property array<string, mixed>|null $meta
+ * @property-read Collection<int, AiModel> $aiModels
  */
 class ApiProvider extends Model
 {
@@ -85,6 +87,19 @@ class ApiProvider extends Model
     public function events(): HasMany
     {
         return $this->hasMany(ProviderEvent::class)->latest('id');
+    }
+
+    /**
+     * @return HasMany<AiModel, $this>
+     */
+    public function aiModels(): HasMany
+    {
+        return $this->hasMany(AiModel::class);
+    }
+
+    public function hasApiKey(): bool
+    {
+        return trim((string) $this->api_key) !== '';
     }
 
     public function isDueForFetch(?Carbon $now = null): bool

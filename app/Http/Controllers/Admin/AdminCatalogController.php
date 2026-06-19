@@ -140,6 +140,7 @@ class AdminCatalogController extends Controller
     {
         return Inertia::render('admin/ApiProviders', [
             'providers' => ApiProvider::query()
+                ->where('type', '!=', ProviderType::Ai->value)
                 ->orderBy('type')
                 ->orderBy('priority')
                 ->get()
@@ -167,7 +168,7 @@ class AdminCatalogController extends Controller
                     'last_fetched_at' => $p->last_fetched_at?->diffForHumans(),
                 ]),
             'statuses' => ProviderStatus::options(),
-            'types' => array_map(fn (ProviderType $t) => ['value' => $t->value, 'label' => $t->label()], ProviderType::cases()),
+            'types' => array_map(fn (ProviderType $t) => ['value' => $t->value, 'label' => $t->label()], $this->catalogProviderTypes()),
             'marketOptions' => array_map(fn (Market $m) => ['value' => $m->value, 'label' => $m->label()], Market::cases()),
             'capabilityOptions' => ['quotes', 'candles', 'news', 'profiles', 'list'],
             'synthetic_counts' => [
@@ -222,7 +223,7 @@ class AdminCatalogController extends Controller
         $validated = $request->validate([
             'key' => ['required', 'string', 'max:64', Rule::unique('api_providers', 'key')->ignore($existing?->id)],
             'name' => ['required', 'string', 'max:120'],
-            'type' => ['required', Rule::in(array_column(ProviderType::cases(), 'value'))],
+            'type' => ['required', Rule::in(array_map(fn (ProviderType $type): string => $type->value, $this->catalogProviderTypes()))],
             'markets' => ['nullable', 'array'],
             'markets.*' => [Rule::in(array_column(Market::cases(), 'value'))],
             'capabilities' => ['nullable', 'array'],
@@ -345,6 +346,17 @@ class AdminCatalogController extends Controller
                     ->orWhereIn('key', ApiProviderRegistry::syntheticKeys());
             })
             ->count();
+    }
+
+    /**
+     * @return array<int, ProviderType>
+     */
+    private function catalogProviderTypes(): array
+    {
+        return array_values(array_filter(
+            ProviderType::cases(),
+            fn (ProviderType $type): bool => $type !== ProviderType::Ai,
+        ));
     }
 
     /**

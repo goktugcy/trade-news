@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\ProviderType;
 use App\Models\ApiProvider;
 use App\Models\SystemJob;
+use App\Services\Ai\AiProviderClientFactory;
 use App\Services\Providers\ProviderHealthService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
@@ -16,11 +18,11 @@ class CheckProviderHealthCommand extends Command
 
     protected $description = 'Probe each active provider and drive its status state machine';
 
-    public function handle(ProviderHealthService $health): int
+    public function handle(ProviderHealthService $health, AiProviderClientFactory $clients): int
     {
-        SystemJob::track('tradenews:check-providers', function () use ($health): void {
-            ApiProvider::query()->where('is_active', true)->get()->each(function (ApiProvider $provider) use ($health): void {
-                [$ok, $latency, $error] = $this->probe($provider);
+        SystemJob::track('tradenews:check-providers', function () use ($health, $clients): void {
+            ApiProvider::query()->where('is_active', true)->get()->each(function (ApiProvider $provider) use ($health, $clients): void {
+                [$ok, $latency, $error] = $this->probe($provider, $clients);
 
                 $provider->forceFill([
                     'last_checked_at' => now(),
@@ -45,8 +47,12 @@ class CheckProviderHealthCommand extends Command
      *
      * @return array{0: bool, 1: int|null, 2: string|null}
      */
-    private function probe(ApiProvider $provider): array
+    private function probe(ApiProvider $provider, AiProviderClientFactory $clients): array
     {
+        if ($provider->type === ProviderType::Ai) {
+            return $this->probeAiProvider($provider, $clients);
+        }
+
         // Local / non-HTTP providers (synthetic, rss, …) are always reachable.
         if (str_starts_with($provider->key, 'synthetic') || ! $provider->base_url) {
             return [true, 0, null];
@@ -66,5 +72,40 @@ class CheckProviderHealthCommand extends Command
         } catch (\Throwable $e) {
             return [false, null, mb_substr($e->getMessage(), 0, 500)];
         }
+    }
+
+    /**
+     * @return array{0: bool, 1: int|null, 2: string|null}
+     */
+    private function probeAiProvider(ApiProvider $provider, AiProviderClientFactory $clients): array
+    {
+        if (! $provider->hasApiKey()) {
+            return [false, 0, 'API key is not configured.'];
+        }
+
+        $model = $provider->aiModels()
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->first();
+
+        if ($model === null) {
+            return [false, 0, 'No active AI model is configured.'];
+        }
+
+        $client = $clients->make($provider);
+
+        if ($client === null) {
+            return [false, 0, 'Unsupported AI provider.'];
+        }
+
+        $model->setRelation('provider', $provider);
+
+        $result = $client->complete(
+            $model,
+            'Reply with exactly OK.',
+            'You are a provider health check. Return only OK and no other text.',
+        );
+
+        return [$result->successful, $result->latencyMs, $result->error];
     }
 }

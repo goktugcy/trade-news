@@ -42,13 +42,28 @@ class ApiProviderSeeder extends Seeder
             ['key' => 'rss', 'name' => 'RSS Feeds', 'type' => ProviderType::News,
                 'base_url' => null, 'priority' => 15, 'status' => ProviderStatus::Operational, 'refresh_interval_minutes' => 5, 'fetch_limit' => 120,
                 'markets' => null, 'capabilities' => ['news'], 'auto_sync_stocks' => false],
+            ['key' => 'openai', 'name' => 'OpenAI', 'type' => ProviderType::Ai,
+                'base_url' => 'https://api.openai.com/v1', 'priority' => 100, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 30, 'fetch_limit' => 50,
+                'markets' => null, 'capabilities' => ['summaries'], 'auto_sync_stocks' => false, 'is_active' => false],
+            ['key' => 'anthropic', 'name' => 'Anthropic', 'type' => ProviderType::Ai,
+                'base_url' => 'https://api.anthropic.com', 'priority' => 110, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 30, 'fetch_limit' => 50,
+                'markets' => null, 'capabilities' => ['summaries'], 'auto_sync_stocks' => false, 'is_active' => false],
+            ['key' => 'gemini', 'name' => 'Google Gemini', 'type' => ProviderType::Ai,
+                'base_url' => 'https://generativelanguage.googleapis.com/v1beta', 'priority' => 120, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 30, 'fetch_limit' => 50,
+                'markets' => null, 'capabilities' => ['summaries'], 'auto_sync_stocks' => false, 'is_active' => false],
+            ['key' => 'grok', 'name' => 'Grok / xAI', 'type' => ProviderType::Ai,
+                'base_url' => 'https://api.x.ai/v1', 'priority' => 130, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 30, 'fetch_limit' => 50,
+                'markets' => null, 'capabilities' => ['summaries'], 'auto_sync_stocks' => false, 'is_active' => false],
         ];
 
         foreach ($providers as $provider) {
             $existing = ApiProvider::query()->where('key', $provider['key'])->first();
 
             if ($existing instanceof ApiProvider) {
-                $existing->update($provider);
+                $update = $provider;
+                unset($update['is_active']);
+
+                $existing->update($update);
 
                 continue;
             }

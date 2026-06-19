@@ -6,6 +6,7 @@ namespace App\Services\Providers;
 
 use App\Enums\NotificationCategory;
 use App\Enums\ProviderStatus;
+use App\Enums\ProviderType;
 use App\Models\ApiProvider;
 use App\Models\ProviderEvent;
 use App\Services\Notification\NotificationCenter;
@@ -80,7 +81,7 @@ class ProviderHealthService
                 "{$provider->name} is being rate-limited",
                 'The provider returned HTTP 429. Consider lowering its fetch limit or refresh interval.',
                 ['provider' => $provider->key],
-                '/admin/providers',
+                $this->adminUrl($provider),
             );
         }
     }
@@ -129,8 +130,13 @@ class ProviderHealthService
             "{$provider->name}: {$from->label()} → {$to->label()}",
             $reason,
             ['provider' => $provider->key, 'from' => $from->value, 'to' => $to->value],
-            '/admin/providers',
+            $this->adminUrl($provider),
         );
+    }
+
+    private function adminUrl(ApiProvider $provider): string
+    {
+        return $provider->type === ProviderType::Ai ? '/admin/ai-settings' : '/admin/providers';
     }
 
     private function activeProvider(string $key): ?ApiProvider

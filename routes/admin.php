@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AdminStockController;
 use App\Http\Controllers\Admin\AdminStockHistoricalPriceController;
 use App\Http\Controllers\Admin\AdminStooqHistoricalPriceController;
 use App\Http\Controllers\Admin\AdminSystemController;
+use App\Http\Controllers\Admin\AiSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'admin'])
@@ -35,6 +36,18 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::put('providers/{apiProvider}', [AdminCatalogController::class, 'updateApiProvider'])->name('providers.update');
         Route::delete('providers/synthetic-data', [AdminCatalogController::class, 'purgeSyntheticData'])->name('providers.synthetic-data.destroy');
         Route::delete('providers/{apiProvider}', [AdminCatalogController::class, 'destroyApiProvider'])->name('providers.destroy');
+
+        // AI settings
+        Route::get('ai-settings', [AiSettingsController::class, 'index'])->name('ai-settings.index');
+        Route::patch('ai-settings', [AiSettingsController::class, 'updateSettings'])->name('ai-settings.update');
+        Route::post('ai-settings/providers', [AiSettingsController::class, 'storeProvider'])->name('ai-settings.providers.store');
+        Route::put('ai-settings/providers/{apiProvider}', [AiSettingsController::class, 'updateProvider'])->name('ai-settings.providers.update');
+        Route::delete('ai-settings/providers/{apiProvider}', [AiSettingsController::class, 'destroyProvider'])->name('ai-settings.providers.destroy');
+        Route::post('ai-settings/models', [AiSettingsController::class, 'storeModel'])->name('ai-settings.models.store');
+        Route::put('ai-settings/models/{aiModel}', [AiSettingsController::class, 'updateModel'])->name('ai-settings.models.update');
+        Route::delete('ai-settings/models/{aiModel}', [AiSettingsController::class, 'destroyModel'])->name('ai-settings.models.destroy');
+        Route::post('ai-settings/models/{aiModel}/activate', [AiSettingsController::class, 'activateModel'])->name('ai-settings.models.activate');
+        Route::post('ai-settings/models/{aiModel}/test', [AiSettingsController::class, 'testModel'])->name('ai-settings.models.test');
 
         // Provider event history, sync logs, system notification center
         Route::get('provider-events', [AdminSystemController::class, 'providerEvents'])->name('provider-events.index');
