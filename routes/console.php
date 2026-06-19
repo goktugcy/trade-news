@@ -41,6 +41,13 @@ Schedule::command('tradenews:fetch-news')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Warm the scrolling ticker + top-movers cache so web requests never run the
+// full (3000+ stock) ranking scan inline.
+Schedule::command('tradenews:warm-market-summary')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // Safety-net matching sweep for anything that slipped through.
 Schedule::command('tradenews:match-news')
     ->everyTenMinutes()

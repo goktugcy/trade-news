@@ -5,7 +5,20 @@ import type { NewsSourcePref } from '@/types';
 defineProps<{ sources: NewsSourcePref[] }>();
 
 function toggle(source: NewsSourcePref, enabled: boolean) {
-    router.patch(`/news/sources/${source.id}`, { enabled }, { preserveScroll: true });
+    // Optimistically flip the checkbox; reload only the feed (skip ticker/options).
+    source.enabled = enabled;
+    router.patch(
+        `/news/sources/${source.id}`,
+        { enabled },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            only: ['news'],
+            onError: () => {
+                source.enabled = !enabled;
+            },
+        },
+    );
 }
 </script>
 

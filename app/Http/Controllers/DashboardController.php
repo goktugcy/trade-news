@@ -64,7 +64,7 @@ class DashboardController extends Controller
         return Inertia::render('Dashboard', [
             'feed' => NewsPresenter::collection($feed),
             'watchlist' => $watchlist,
-            'topMovers' => $summary->topMovers(),
+            'topMovers' => $summary->cachedTopMovers(),
             'marketStatus' => $sessions->all($user->timezone),
             'latestAlerts' => $latestAlerts,
             'stats' => [

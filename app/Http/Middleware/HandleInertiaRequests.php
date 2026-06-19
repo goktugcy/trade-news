@@ -52,9 +52,10 @@ class HandleInertiaRequests extends Middleware
                         : UserDataPreference::DEFAULT_AUTO_REFRESH_SECONDS,
                 ];
             },
-            // Scrolling top-bar ticker — cached, so cheap to share on every request.
+            // Scrolling top-bar ticker — read-only cache (warmed by the scheduler),
+            // so it never triggers the heavy ranking scan on a web request.
             'ticker' => fn () => $request->user()
-                ? app(MarketSummaryService::class)->ticker()
+                ? app(MarketSummaryService::class)->cachedTicker()
                 : [],
             // Header bell: unread count for the in-app notification inbox.
             'notifications' => fn () => [

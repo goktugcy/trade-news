@@ -21,8 +21,19 @@ class StockPresenter
      */
     public static function row(Stock $stock, array $flags = []): array
     {
-        $quote = self::quote($stock);
+        return self::rowWithQuote($stock, self::quote($stock), $flags);
+    }
 
+    /**
+     * Assemble a row from a stock + an already-resolved quote (no per-stock
+     * lookups). Lets batch callers (e.g. MarketSummaryService) avoid N+1.
+     *
+     * @param  array<string, mixed>  $quote
+     * @param  array<string, bool|int|null>  $flags
+     * @return array<string, mixed>
+     */
+    public static function rowWithQuote(Stock $stock, array $quote, array $flags = []): array
+    {
         return [
             'id' => $stock->id,
             'symbol' => $stock->symbol,
@@ -87,7 +98,7 @@ class StockPresenter
         ];
     }
 
-    private static function hideSyntheticMarketData(): bool
+    public static function hideSyntheticMarketData(): bool
     {
         return app(ApiProviderRegistry::class)->shouldHideSyntheticMarketData();
     }
@@ -95,7 +106,7 @@ class StockPresenter
     /**
      * @param  array<string, mixed>  $quote
      */
-    private static function shouldHideCachedQuote(array $quote, bool $apiActive): bool
+    public static function shouldHideCachedQuote(array $quote, bool $apiActive): bool
     {
         if (! $apiActive) {
             return false;
