@@ -26,7 +26,7 @@ watch(
 );
 
 // Minimal round-trip: skip every other prop (the ticker, the 15-card feed).
-const partial = { preserveScroll: true, preserveState: true, only: ['flash'] } as const;
+const partial = { preserveScroll: true, preserveState: true, only: ['flash'] };
 
 function react(value: 1 | -1) {
     // Mirror the server toggle locally (re-clicking the same value clears it).

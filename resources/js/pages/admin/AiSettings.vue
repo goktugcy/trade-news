@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { CheckCircle2, Pencil, Play, Plus, Save, Trash2, X } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import {
-    activateModel,
     destroyModel,
     destroyProvider,
+    enableProviderModels,
     storeModel,
     storeProvider,
     testModel,
+    testTask,
+    toggleModel,
     updateModel,
     updateProvider,
     updateSettings,
+    updateTask,
 } from '@/actions/App/Http/Controllers/Admin/AiSettingsController';
 import AdminNav from '@/components/tradenews/AdminNav.vue';
 import { Button } from '@/components/ui/button';
@@ -24,10 +27,37 @@ type AiModel = {
     api_provider_id: number;
     name: string;
     model: string;
+    task: string | null;
+    runtime: string | null;
+    endpoint_url: string | null;
     is_active: boolean;
+    status: string;
+    status_label: string;
+    status_color: string;
+    last_error: string | null;
+    last_latency_ms: number | null;
+    last_checked_at: string | null;
     max_output_tokens: number;
     temperature: number | null;
     is_selected: boolean;
+};
+
+type EnumOption = { value: string; label: string };
+
+type AiTaskRow = {
+    task: string;
+    label: string;
+    default_runtime: string;
+    enabled: boolean;
+    active_ai_model_id: number | null;
+    fallback_behavior: string | null;
+    status: string | null;
+    status_label: string | null;
+    status_color: string | null;
+    last_error: string | null;
+    last_latency_ms: number | null;
+    last_checked_at: string | null;
+    models: SelectOption[];
 };
 
 type AiProvider = {
@@ -91,6 +121,9 @@ type ModelForm = {
     api_provider_id: number | null;
     name: string;
     model: string;
+    task: string | null;
+    runtime: string | null;
+    endpoint_url: string;
     is_active: boolean;
     max_output_tokens: number;
     temperature: number | null;
@@ -101,6 +134,9 @@ const props = defineProps<{
     status: StatusPayload;
     providers: AiProvider[];
     providerOptions: ProviderOption[];
+    tasks: AiTaskRow[];
+    taskOptions: EnumOption[];
+    runtimeOptions: EnumOption[];
 }>();
 
 defineOptions({
@@ -157,10 +193,43 @@ const modelForm = useForm<ModelForm>({
     api_provider_id: props.providers[0]?.id ?? null,
     name: '',
     model: '',
+    task: null,
+    runtime: null,
+    endpoint_url: '',
     is_active: true,
     max_output_tokens: 160,
     temperature: null,
 });
+
+// Editable local copies of each task row (committed via saveTask).
+const taskRows = ref<AiTaskRow[]>(props.tasks.map((row) => ({ ...row })));
+
+watch(
+    () => props.tasks,
+    (rows) => {
+        taskRows.value = rows.map((row) => ({ ...row }));
+    },
+);
+
+function saveTask(row: AiTaskRow) {
+    router.patch(
+        updateTask.url(row.task),
+        {
+            enabled: row.enabled,
+            active_ai_model_id: row.active_ai_model_id,
+            fallback_behavior: row.fallback_behavior,
+        },
+        { preserveScroll: true },
+    );
+}
+
+function testTaskConnection(row: AiTaskRow) {
+    router.post(testTask.url(row.task), {}, { preserveScroll: true });
+}
+
+function setFallback(row: AiTaskRow, value: string | number) {
+    row.fallback_behavior = String(value) || null;
+}
 
 const modelTemperature = computed<string | number>({
     get: () => modelForm.temperature ?? '',
@@ -249,6 +318,9 @@ function resetModelForm(providerId: number | null = props.providers[0]?.id ?? nu
     modelForm.api_provider_id = providerId;
     modelForm.name = '';
     modelForm.model = '';
+    modelForm.task = null;
+    modelForm.runtime = null;
+    modelForm.endpoint_url = '';
     modelForm.is_active = true;
     modelForm.max_output_tokens = 160;
     modelForm.temperature = null;
@@ -265,6 +337,9 @@ function openModelEdit(model: AiModel) {
     modelForm.api_provider_id = model.api_provider_id;
     modelForm.name = model.name;
     modelForm.model = model.model;
+    modelForm.task = model.task;
+    modelForm.runtime = model.runtime;
+    modelForm.endpoint_url = model.endpoint_url ?? '';
     modelForm.is_active = model.is_active;
     modelForm.max_output_tokens = model.max_output_tokens;
     modelForm.temperature = model.temperature;
@@ -289,8 +364,16 @@ function removeModel(model: AiModel) {
     }
 }
 
-function makeActive(model: AiModel) {
-    router.post(activateModel.url(model.id), {}, { preserveScroll: true });
+function hasDisabledModels(provider: AiProvider): boolean {
+    return provider.models.some((model) => !model.is_active);
+}
+
+function enableAllProviderModels(provider: AiProvider) {
+    router.patch(enableProviderModels.url(provider.id), {}, { preserveScroll: true });
+}
+
+function toggleModelEnabled(model: AiModel) {
+    router.patch(toggleModel.url(model.id), {}, { preserveScroll: true });
 }
 
 function testConnection(model: AiModel) {
@@ -307,7 +390,7 @@ function testConnection(model: AiModel) {
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h1 class="text-lg font-semibold text-foreground">AI Settings</h1>
-                <p class="mt-1 text-sm text-muted-foreground">Manage the single active AI provider and model used by summaries.</p>
+                <p class="mt-1 text-sm text-muted-foreground">Manage AI providers, per-task models, and Hugging Face dedicated endpoints.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" @click="openModelCreate()">
@@ -347,17 +430,18 @@ function testConnection(model: AiModel) {
                     </label>
 
                     <div class="space-y-1.5">
-                        <Label for="active-ai-model">Active model</Label>
+                        <Label for="active-ai-model">Global fallback model</Label>
                         <select
                             id="active-ai-model"
                             v-model="settingsForm.active_ai_model_id"
                             class="border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] dark:bg-input/30"
                             :aria-invalid="Boolean(settingsForm.errors.active_ai_model_id)"
                         >
-                            <option :value="null">No active model</option>
+                            <option :value="null">No fallback model</option>
                             <option v-for="option in activeModelOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
                         </select>
                         <p v-if="settingsForm.errors.active_ai_model_id" class="text-xs text-destructive">{{ settingsForm.errors.active_ai_model_id }}</p>
+                        <p class="text-xs text-muted-foreground">Per-task models below can all stay enabled; this is only the legacy fallback selector.</p>
                     </div>
                 </div>
 
@@ -367,6 +451,73 @@ function testConnection(model: AiModel) {
                 </Button>
             </div>
         </form>
+
+        <!-- Task matrix -->
+        <section class="rounded-lg border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+            <h2 class="text-sm font-semibold text-foreground">AI tasks</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Enable AI per task and pick the model it uses. Disabled tasks fall back to the deterministic pipeline.</p>
+
+            <div class="mt-3 overflow-x-auto">
+                <table class="w-full min-w-180 text-sm">
+                    <thead>
+                        <tr class="border-b border-sidebar-border/70 text-left text-xs tracking-wide text-muted-foreground uppercase dark:border-sidebar-border">
+                            <th class="px-2 py-2 font-medium">Task</th>
+                            <th class="px-2 py-2 font-medium">Enabled</th>
+                            <th class="px-2 py-2 font-medium">Model</th>
+                            <th class="px-2 py-2 font-medium">Status</th>
+                            <th class="px-2 py-2 font-medium">Fallback</th>
+                            <th class="px-2 py-2 text-right font-medium">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
+                        <tr v-for="row in taskRows" :key="row.task">
+                            <td class="px-2 py-2">
+                                <div class="font-medium text-foreground">{{ row.label }}</div>
+                                <div v-if="row.last_error" class="mt-0.5 max-w-[16rem] truncate text-[11px] text-rose-600 dark:text-rose-400" :title="row.last_error">{{ row.last_error }}</div>
+                            </td>
+                            <td class="px-2 py-2">
+                                <input type="checkbox" class="size-4 rounded border-input accent-primary" v-model="row.enabled" @change="saveTask(row)" />
+                            </td>
+                            <td class="px-2 py-2">
+                                <select
+                                    v-model="row.active_ai_model_id"
+                                    class="border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-8 w-full min-w-48 rounded-md border px-2 text-sm shadow-xs outline-none dark:bg-input/30"
+                                    @change="saveTask(row)"
+                                >
+                                    <option :value="null">No model</option>
+                                    <option v-for="option in row.models" :key="option.value" :value="option.value">{{ option.label }}</option>
+                                </select>
+                            </td>
+                            <td class="px-2 py-2">
+                                <span v-if="row.status" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <span class="size-2 rounded-full" :class="dotClass(row.status_color ?? 'slate')" />
+                                    {{ row.status_label }}
+                                    <span v-if="row.last_latency_ms !== null">· {{ row.last_latency_ms }} ms</span>
+                                </span>
+                                <span v-else class="text-xs text-muted-foreground">—</span>
+                            </td>
+                            <td class="px-2 py-2">
+                                <Input
+                                    :model-value="row.fallback_behavior ?? ''"
+                                    class="h-8 w-32"
+                                    placeholder="default"
+                                    @update:model-value="(v) => setFallback(row, v)"
+                                    @blur="saveTask(row)"
+                                />
+                            </td>
+                            <td class="px-2 py-2">
+                                <div class="flex justify-end">
+                                    <Button type="button" size="sm" variant="outline" :disabled="row.active_ai_model_id === null" @click="testTaskConnection(row)">
+                                        <Play class="size-4" />
+                                        Test
+                                    </Button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
         <div class="grid gap-4 xl:grid-cols-2">
             <section
@@ -394,6 +545,10 @@ function testConnection(model: AiModel) {
                     </div>
 
                     <div class="flex items-center gap-1">
+                        <Button type="button" size="sm" variant="outline" :disabled="provider.models.length === 0 || !hasDisabledModels(provider)" @click="enableAllProviderModels(provider)">
+                            <CheckCircle2 class="size-4" />
+                            Enable all
+                        </Button>
                         <button type="button" class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground" title="Add model" @click="openModelCreate(provider)">
                             <Plus class="size-4" />
                         </button>
@@ -416,8 +571,17 @@ function testConnection(model: AiModel) {
                             <div class="flex flex-wrap items-center gap-2">
                                 <h3 class="truncate text-sm font-medium text-foreground">{{ model.name }}</h3>
                                 <span class="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{{ model.model }}</span>
-                                <span v-if="model.is_selected" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">active</span>
-                                <span v-if="!model.is_active" class="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">disabled</span>
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-[11px]"
+                                    :class="
+                                        model.is_active
+                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                                            : 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
+                                    "
+                                >
+                                    {{ model.is_active ? 'enabled' : 'disabled' }}
+                                </span>
+                                <span v-if="model.is_selected" class="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">global fallback</span>
                             </div>
                             <p class="mt-1 text-xs text-muted-foreground">
                                 {{ model.max_output_tokens }} max tokens · temperature {{ model.temperature ?? 'default' }}
@@ -425,9 +589,10 @@ function testConnection(model: AiModel) {
                         </div>
 
                         <div class="flex flex-wrap items-center gap-1">
-                            <Button type="button" size="sm" variant="outline" :disabled="model.is_selected" @click="makeActive(model)">
-                                <CheckCircle2 class="size-4" />
-                                Activate
+                            <Button type="button" size="sm" variant="outline" @click="toggleModelEnabled(model)">
+                                <CheckCircle2 v-if="!model.is_active" class="size-4" />
+                                <X v-else class="size-4" />
+                                {{ model.is_active ? 'Disable' : 'Enable' }}
                             </Button>
                             <Button type="button" size="sm" variant="outline" @click="testConnection(model)">
                                 <Play class="size-4" />
@@ -577,6 +742,41 @@ function testConnection(model: AiModel) {
                             <Input id="ai-model-id" v-model="modelForm.model" autocomplete="off" placeholder="gpt-4.1-mini" :aria-invalid="Boolean(modelForm.errors.model)" />
                             <p v-if="modelForm.errors.model" class="text-xs text-destructive">{{ modelForm.errors.model }}</p>
                         </div>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div class="space-y-1.5">
+                            <Label for="ai-model-task">Task</Label>
+                            <select
+                                id="ai-model-task"
+                                v-model="modelForm.task"
+                                class="border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] dark:bg-input/30"
+                                :aria-invalid="Boolean(modelForm.errors.task)"
+                            >
+                                <option :value="null">No task (generic)</option>
+                                <option v-for="option in taskOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                            </select>
+                            <p v-if="modelForm.errors.task" class="text-xs text-destructive">{{ modelForm.errors.task }}</p>
+                        </div>
+                        <div class="space-y-1.5">
+                            <Label for="ai-model-runtime">Runtime</Label>
+                            <select
+                                id="ai-model-runtime"
+                                v-model="modelForm.runtime"
+                                class="border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] dark:bg-input/30"
+                                :aria-invalid="Boolean(modelForm.errors.runtime)"
+                            >
+                                <option :value="null">Default</option>
+                                <option v-for="option in runtimeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                            </select>
+                            <p v-if="modelForm.errors.runtime" class="text-xs text-destructive">{{ modelForm.errors.runtime }}</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <Label for="ai-model-endpoint">Endpoint URL <span class="text-muted-foreground">(Hugging Face dedicated endpoint)</span></Label>
+                        <Input id="ai-model-endpoint" v-model="modelForm.endpoint_url" type="url" autocomplete="off" placeholder="https://xxxx.endpoints.huggingface.cloud" :aria-invalid="Boolean(modelForm.errors.endpoint_url)" />
+                        <p v-if="modelForm.errors.endpoint_url" class="text-xs text-destructive">{{ modelForm.errors.endpoint_url }}</p>
                     </div>
 
                     <div class="grid gap-3 sm:grid-cols-2">

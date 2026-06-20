@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\AiRuntime;
+use App\Enums\AiTask;
 use App\Enums\ProviderStatus;
 use App\Enums\ProviderType;
 use App\Models\AiModel;
@@ -111,6 +113,68 @@ it('uses NullSummarizer behavior when no active AI model is configured', functio
 
     expect($summarizer)->toBeInstanceOf(NullSummarizer::class)
         ->and($summarizer->isEnabled())->toBeFalse();
+});
+
+it('can enable multiple models under the same AI provider without disabling siblings', function () {
+    $admin = User::factory()->admin()->create();
+    $provider = aiSettingsProvider([
+        'key' => 'huggingface',
+        'name' => 'Hugging Face',
+        'base_url' => null,
+    ]);
+
+    $summary = aiSettingsModel($provider, [
+        'name' => 'Qwen summary',
+        'model' => 'Qwen/Qwen3-8B',
+        'task' => AiTask::Summary,
+        'runtime' => AiRuntime::OpenAiChat,
+        'is_active' => false,
+    ]);
+    $sentiment = aiSettingsModel($provider, [
+        'name' => 'FinBERT',
+        'model' => 'ProsusAI/finbert',
+        'task' => AiTask::SentimentEn,
+        'runtime' => AiRuntime::HfTextClassification,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch("/admin/ai-settings/models/{$summary->id}/toggle")
+        ->assertRedirect();
+
+    expect($summary->fresh()->is_active)->toBeTrue()
+        ->and($sentiment->fresh()->is_active)->toBeTrue();
+});
+
+it('can enable all models for an AI provider at once', function () {
+    $admin = User::factory()->admin()->create();
+    $provider = aiSettingsProvider([
+        'key' => 'huggingface',
+        'name' => 'Hugging Face',
+        'base_url' => null,
+    ]);
+
+    $summary = aiSettingsModel($provider, [
+        'name' => 'Qwen summary',
+        'model' => 'Qwen/Qwen3-8B',
+        'task' => AiTask::Summary,
+        'runtime' => AiRuntime::OpenAiChat,
+        'is_active' => false,
+    ]);
+    $sentiment = aiSettingsModel($provider, [
+        'name' => 'FinBERT',
+        'model' => 'ProsusAI/finbert',
+        'task' => AiTask::SentimentEn,
+        'runtime' => AiRuntime::HfTextClassification,
+        'is_active' => false,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch("/admin/ai-settings/providers/{$provider->id}/models/enable")
+        ->assertRedirect();
+
+    expect($summary->fresh()->is_active)->toBeTrue()
+        ->and($sentiment->fresh()->is_active)->toBeTrue();
 });
 
 it('AiProvider clients send the expected request for OpenAI, Anthropic, Gemini, and Grok', function () {

@@ -77,6 +77,17 @@ Schedule::command('tradenews:sync-market-stocks')
     ->withoutOverlapping()
     ->onOneServer();
 
+// AI stock analyses: watchlist + recent important-news stocks hourly, all daily.
+Schedule::command('tradenews:generate-stock-analyses --scope=hourly')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer();
+
+Schedule::command('tradenews:generate-stock-analyses --scope=daily')
+    ->dailyAt('04:00')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // Nightly cleanup of stale data + duplicate news.
 Schedule::command('tradenews:cleanup')
     ->dailyAt('03:30')

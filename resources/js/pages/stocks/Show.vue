@@ -10,12 +10,38 @@ import { Button } from '@/components/ui/button';
 import { formatNumber, formatPrice } from '@/lib/format';
 import type { NewsCardData, SelectOption, StockRow } from '@/types';
 
+type AiStockAnalysis = {
+    signal: string;
+    signal_label: string;
+    signal_color: string;
+    confidence: number;
+    horizon: string | null;
+    estimated_price_low: number | null;
+    estimated_price_high: number | null;
+    estimated_price: number | null;
+    currency: string | null;
+    summary: string | null;
+    drivers: string[];
+    risks: string[];
+    disclaimer: string;
+    generated_at: string | null;
+    is_stale: boolean;
+    ai_enabled: boolean;
+};
+
 const props = defineProps<{
     stock: StockRow;
     news: NewsCardData[];
+    analysis: AiStockAnalysis | null;
     timeframes: SelectOption[];
     chartRanges: SelectOption[];
 }>();
+
+const signalClasses: Record<string, string> = {
+    emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    rose: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+    slate: 'bg-muted text-muted-foreground',
+};
 
 defineOptions({
     layout: {
@@ -145,6 +171,61 @@ function toggleAlert() {
                 </div>
             </div>
             <StockChart :symbol="stock.symbol" :timeframe="timeframe" :range="range" />
+        </div>
+
+        <!-- AI analysis -->
+        <div class="rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold text-foreground">AI analysis</h2>
+                <div v-if="analysis" class="flex items-center gap-2">
+                    <span class="rounded-full px-2 py-0.5 text-[11px] font-medium" :class="signalClasses[analysis.signal_color] ?? signalClasses.slate">
+                        {{ analysis.signal_label }} · {{ analysis.confidence }}%
+                    </span>
+                    <span v-if="analysis.is_stale" class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                        {{ analysis.ai_enabled ? 'Stale' : 'AI off · stale' }}
+                    </span>
+                </div>
+            </div>
+
+            <template v-if="analysis">
+                <p v-if="analysis.summary" class="text-sm text-foreground">{{ analysis.summary }}</p>
+
+                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div v-if="analysis.estimated_price !== null || analysis.estimated_price_low !== null" class="rounded-lg border border-sidebar-border/70 p-3 text-sm dark:border-sidebar-border">
+                        <p class="text-xs text-muted-foreground">Estimated price{{ analysis.horizon ? ` · ${analysis.horizon}` : '' }}</p>
+                        <p class="mt-1 font-semibold tabular-nums text-foreground">
+                            <template v-if="analysis.estimated_price_low !== null && analysis.estimated_price_high !== null">
+                                {{ formatPrice(analysis.estimated_price_low, analysis.currency ?? stock.currency) }}
+                                – {{ formatPrice(analysis.estimated_price_high, analysis.currency ?? stock.currency) }}
+                            </template>
+                            <template v-else-if="analysis.estimated_price !== null">
+                                {{ formatPrice(analysis.estimated_price, analysis.currency ?? stock.currency) }}
+                            </template>
+                        </p>
+                    </div>
+
+                    <div v-if="analysis.drivers.length" class="rounded-lg border border-sidebar-border/70 p-3 text-sm dark:border-sidebar-border">
+                        <p class="text-xs text-muted-foreground">Key drivers</p>
+                        <ul class="mt-1 list-disc space-y-0.5 pl-4 text-foreground">
+                            <li v-for="(driver, i) in analysis.drivers" :key="i">{{ driver }}</li>
+                        </ul>
+                    </div>
+
+                    <div v-if="analysis.risks.length" class="rounded-lg border border-sidebar-border/70 p-3 text-sm dark:border-sidebar-border">
+                        <p class="text-xs text-muted-foreground">Risks</p>
+                        <ul class="mt-1 list-disc space-y-0.5 pl-4 text-foreground">
+                            <li v-for="(risk, i) in analysis.risks" :key="i">{{ risk }}</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <p v-if="analysis.generated_at" class="mt-3 text-xs text-muted-foreground">Generated {{ analysis.generated_at }}</p>
+                <p class="mt-2 text-[11px] leading-snug text-muted-foreground">{{ analysis.disclaimer }}</p>
+            </template>
+
+            <p v-else class="text-sm text-muted-foreground">
+                No AI analysis yet. It is generated in the background and will appear here once available.
+            </p>
         </div>
 
         <!-- Related news -->

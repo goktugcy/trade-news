@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ApiProviderSeeder::class,
+            AiTaskSeeder::class,
             StockSeeder::class,
             DemoContentSeeder::class,
         ]);

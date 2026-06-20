@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\AiRuntime;
+use App\Enums\AiTask;
 use App\Enums\ProviderType;
 use App\Models\AiModel;
 use App\Models\ApiProvider;
@@ -36,5 +38,26 @@ class AiModelFactory extends Factory
             'temperature' => 0.3,
             'meta' => [],
         ];
+    }
+
+    /**
+     * A Hugging Face dedicated-endpoint model for a given task + runtime.
+     */
+    public function huggingFace(AiTask $task, AiRuntime $runtime, string $endpointUrl): static
+    {
+        return $this->state(fn (): array => [
+            'api_provider_id' => ApiProvider::factory()->state([
+                'key' => 'huggingface',
+                'name' => 'Hugging Face',
+                'type' => ProviderType::Ai,
+                'base_url' => null,
+                'api_key' => 'hf-secret',
+            ]),
+            'name' => 'HF '.$task->value,
+            'model' => $task->value.'-model',
+            'task' => $task,
+            'runtime' => $runtime,
+            'endpoint_url' => $endpointUrl,
+        ]);
     }
 }

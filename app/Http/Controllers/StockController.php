@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\AiTask;
 use App\Enums\Market;
 use App\Enums\ProviderType;
 use App\Enums\Timeframe;
 use App\Models\Stock;
+use App\Models\StockAiAnalysis;
 use App\Models\StockPrice;
+use App\Services\Ai\AiTaskService;
 use App\Services\MarketData\MarketDataIngestor;
 use App\Services\Providers\ApiProviderRegistry;
 use App\Support\Presenters\NewsPresenter;
@@ -108,12 +111,49 @@ class StockController extends Controller
                 'watchlist_id' => $watchlistEntry?->id,
             ]),
             'news' => NewsPresenter::collection($relatedNews),
+            'analysis' => $this->analysisPayload($stock),
             'timeframes' => array_map(fn (Timeframe $t) => [
                 'value' => $t->value,
                 'label' => $t->label(),
             ], Timeframe::cases()),
             'chartRanges' => $this->chartRangeOptions(),
         ]);
+    }
+
+    /**
+     * The latest cached AI analysis for the stock detail page. Read-only — never
+     * triggers AI generation (that happens in GenerateStockAnalysisJob).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function analysisPayload(Stock $stock): ?array
+    {
+        $analysis = $stock->latestAiAnalysis()->first();
+
+        $aiEnabled = app(AiTaskService::class)->isEnabled(AiTask::StockAnalysis);
+
+        if ($analysis === null) {
+            return null;
+        }
+
+        return [
+            'signal' => $analysis->signal->value,
+            'signal_label' => $analysis->signal->label(),
+            'signal_color' => $analysis->signal->color(),
+            'confidence' => $analysis->confidence,
+            'horizon' => $analysis->horizon,
+            'estimated_price_low' => $analysis->estimated_price_low,
+            'estimated_price_high' => $analysis->estimated_price_high,
+            'estimated_price' => $analysis->estimated_price,
+            'currency' => $analysis->currency,
+            'summary' => $analysis->summary,
+            'drivers' => $analysis->drivers ?? [],
+            'risks' => $analysis->risks ?? [],
+            'disclaimer' => $analysis->disclaimer ?? StockAiAnalysis::DISCLAIMER,
+            'generated_at' => $analysis->generated_at?->diffForHumans(),
+            'is_stale' => $analysis->isStale() || ! $aiEnabled,
+            'ai_enabled' => $aiEnabled,
+        ];
     }
 
     /**

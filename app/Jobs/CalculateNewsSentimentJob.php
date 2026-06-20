@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\NewsItem;
-use App\Services\News\SentimentAnalyzer;
+use App\Services\News\NewsSentimentService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -27,17 +27,18 @@ class CalculateNewsSentimentJob implements ShouldQueue
      */
     public function __construct(public ?array $newsItemIds = null) {}
 
-    public function handle(SentimentAnalyzer $analyzer): void
+    public function handle(NewsSentimentService $sentiment): void
     {
         NewsItem::query()
+            ->with('source:id,language')
             ->when(
                 $this->newsItemIds !== null,
                 fn ($q) => $q->whereIn('id', $this->newsItemIds),
                 fn ($q) => $q->whereNull('sentiment'),
             )
-            ->chunkById(200, function ($items) use ($analyzer): void {
+            ->chunkById(200, function ($items) use ($sentiment): void {
                 foreach ($items as $item) {
-                    $analyzer->applyTo($item);
+                    $sentiment->applyTo($item);
                 }
             });
     }

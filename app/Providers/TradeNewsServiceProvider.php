@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Enums\AiTask;
 use App\Enums\ProviderType;
 use App\Models\AiSetting;
 use App\Models\ApiProvider;
 use App\Models\User;
 use App\Services\Ai\AiProviderClientFactory;
+use App\Services\Ai\AiTaskService;
 use App\Services\MarketData\FallbackMarketDataProvider;
 use App\Services\MarketData\FinnhubProvider;
 use App\Services\MarketData\MarketDataProviderInterface;
@@ -80,6 +82,17 @@ class TradeNewsServiceProvider extends ServiceProvider
         // AI summaries are optional: with an OpenAI key we use it, otherwise a
         // null summarizer keeps the pipeline working with the original summary.
         $this->app->singleton(AiSummarizerInterface::class, function (): AiSummarizerInterface {
+            // Prefer the task-based Summary model when it is enabled + healthy.
+            $taskModel = app(AiTaskService::class)->modelFor(AiTask::Summary);
+
+            if ($taskModel !== null) {
+                $client = app(AiProviderClientFactory::class)->make($taskModel->provider);
+
+                if ($client !== null) {
+                    return new AiSummarizer($client, $taskModel);
+                }
+            }
+
             $setting = AiSetting::query()->with(['activeModel.provider'])->first();
 
             if ($setting instanceof AiSetting) {

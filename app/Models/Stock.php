@@ -87,6 +87,24 @@ class Stock extends Model
     }
 
     /**
+     * @return HasMany<StockAiAnalysis, $this>
+     */
+    public function aiAnalyses(): HasMany
+    {
+        return $this->hasMany(StockAiAnalysis::class);
+    }
+
+    /**
+     * The most recent AI analysis for this stock.
+     *
+     * @return HasOne<StockAiAnalysis, $this>
+     */
+    public function latestAiAnalysis(): HasOne
+    {
+        return $this->hasOne(StockAiAnalysis::class)->latestOfMany('generated_at');
+    }
+
+    /**
      * The most recent intraday candle (used for "current price").
      *
      * @return HasOne<StockPrice, $this>

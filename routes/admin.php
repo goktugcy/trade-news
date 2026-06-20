@@ -42,12 +42,16 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::patch('ai-settings', [AiSettingsController::class, 'updateSettings'])->name('ai-settings.update');
         Route::post('ai-settings/providers', [AiSettingsController::class, 'storeProvider'])->name('ai-settings.providers.store');
         Route::put('ai-settings/providers/{apiProvider}', [AiSettingsController::class, 'updateProvider'])->name('ai-settings.providers.update');
+        Route::patch('ai-settings/providers/{apiProvider}/models/enable', [AiSettingsController::class, 'enableProviderModels'])->name('ai-settings.providers.models.enable');
         Route::delete('ai-settings/providers/{apiProvider}', [AiSettingsController::class, 'destroyProvider'])->name('ai-settings.providers.destroy');
         Route::post('ai-settings/models', [AiSettingsController::class, 'storeModel'])->name('ai-settings.models.store');
         Route::put('ai-settings/models/{aiModel}', [AiSettingsController::class, 'updateModel'])->name('ai-settings.models.update');
+        Route::patch('ai-settings/models/{aiModel}/toggle', [AiSettingsController::class, 'toggleModel'])->name('ai-settings.models.toggle');
         Route::delete('ai-settings/models/{aiModel}', [AiSettingsController::class, 'destroyModel'])->name('ai-settings.models.destroy');
         Route::post('ai-settings/models/{aiModel}/activate', [AiSettingsController::class, 'activateModel'])->name('ai-settings.models.activate');
         Route::post('ai-settings/models/{aiModel}/test', [AiSettingsController::class, 'testModel'])->name('ai-settings.models.test');
+        Route::patch('ai-settings/tasks/{task}', [AiSettingsController::class, 'updateTask'])->name('ai-settings.tasks.update');
+        Route::post('ai-settings/tasks/{task}/test', [AiSettingsController::class, 'testTask'])->name('ai-settings.tasks.test');
 
         // Provider event history, sync logs, system notification center
         Route::get('provider-events', [AdminSystemController::class, 'providerEvents'])->name('provider-events.index');

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\AiRuntime;
+use App\Enums\AiTask;
 use App\Enums\ProviderStatus;
 use App\Enums\ProviderType;
 use App\Http\Controllers\Controller;
@@ -11,13 +13,17 @@ use App\Http\Requests\Admin\StoreAiModelRequest;
 use App\Http\Requests\Admin\StoreAiProviderRequest;
 use App\Http\Requests\Admin\UpdateAiProviderRequest;
 use App\Http\Requests\Admin\UpdateAiSettingsRequest;
+use App\Http\Requests\Admin\UpdateAiTaskRequest;
 use App\Models\AiModel;
 use App\Models\AiSetting;
+use App\Models\AiTaskSetting;
 use App\Models\ApiProvider;
 use App\Services\Ai\AiCompletionResult;
 use App\Services\Ai\AiProviderClientFactory;
+use App\Services\Ai\AiTaskService;
 use App\Services\Providers\ProviderHealthService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -33,6 +39,8 @@ class AiSettingsController extends Controller
             ->orderBy('name')
             ->get();
 
+        $models = $providers->flatMap(fn (ApiProvider $provider) => $provider->aiModels);
+
         return Inertia::render('admin/AiSettings', [
             'settings' => [
                 'enabled' => $setting->enabled,
@@ -41,7 +49,55 @@ class AiSettingsController extends Controller
             'status' => $this->statusPayload($setting),
             'providers' => $providers->map(fn (ApiProvider $provider): array => $this->providerPayload($provider, $setting->active_ai_model_id))->values(),
             'providerOptions' => AiProviderClientFactory::providerOptions(),
+            'tasks' => $this->taskPayloads($models),
+            'taskOptions' => AiTask::options(),
+            'runtimeOptions' => AiRuntime::options(),
         ]);
+    }
+
+    public function updateTask(UpdateAiTaskRequest $request, string $task): RedirectResponse
+    {
+        $taskEnum = AiTask::tryFrom($task);
+        abort_if($taskEnum === null, 404);
+
+        $validated = $request->validated();
+
+        if (($validated['active_ai_model_id'] ?? null) !== null) {
+            AiModel::query()
+                ->whereKey($validated['active_ai_model_id'])
+                ->whereHas('provider', fn ($query) => $query->where('type', ProviderType::Ai->value))
+                ->firstOrFail();
+        }
+
+        AiTaskSetting::query()->updateOrCreate(
+            ['task' => $taskEnum->value],
+            [
+                'enabled' => $validated['enabled'] ?? false,
+                'active_ai_model_id' => $validated['active_ai_model_id'] ?? null,
+                'fallback_behavior' => $validated['fallback_behavior'] ?? null,
+            ],
+        );
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'AI task updated.']);
+
+        return back();
+    }
+
+    public function testTask(string $task, AiTaskService $tasks, AiProviderClientFactory $clients, ProviderHealthService $health): RedirectResponse
+    {
+        $taskEnum = AiTask::tryFrom($task);
+        abort_if($taskEnum === null, 404);
+
+        $setting = AiTaskSetting::query()->with('activeModel.provider')->where('task', $taskEnum->value)->first();
+        $model = $setting?->activeModel;
+
+        if ($model === null) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Select an active model for this task first.']);
+
+            return back();
+        }
+
+        return $this->runModelTest($model, $tasks, $clients, $health);
     }
 
     public function updateSettings(UpdateAiSettingsRequest $request): RedirectResponse
@@ -120,6 +176,17 @@ class AiSettingsController extends Controller
         return back();
     }
 
+    public function enableProviderModels(ApiProvider $apiProvider): RedirectResponse
+    {
+        $this->ensureAiProvider($apiProvider);
+
+        $apiProvider->aiModels()->update(['is_active' => true]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'AI provider models enabled.']);
+
+        return back();
+    }
+
     public function storeModel(StoreAiModelRequest $request): RedirectResponse
     {
         $validated = $request->validated();
@@ -168,6 +235,20 @@ class AiSettingsController extends Controller
         return back();
     }
 
+    public function toggleModel(AiModel $aiModel): RedirectResponse
+    {
+        $this->ensureAiProvider($aiModel->provider);
+
+        $aiModel->update(['is_active' => ! $aiModel->is_active]);
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => $aiModel->is_active ? 'AI model enabled.' : 'AI model disabled.',
+        ]);
+
+        return back();
+    }
+
     public function activateModel(AiModel $aiModel): RedirectResponse
     {
         $this->ensureAiProvider($aiModel->provider);
@@ -182,24 +263,35 @@ class AiSettingsController extends Controller
         return back();
     }
 
-    public function testModel(AiModel $aiModel, AiProviderClientFactory $clients, ProviderHealthService $health): RedirectResponse
+    public function testModel(AiModel $aiModel, AiTaskService $tasks, AiProviderClientFactory $clients, ProviderHealthService $health): RedirectResponse
+    {
+        $this->ensureAiProvider($aiModel->provider);
+
+        return $this->runModelTest($aiModel, $tasks, $clients, $health);
+    }
+
+    /**
+     * Runtime-aware connection test: chat models do a completion, HF pipeline
+     * models exercise their pipeline. Records health on both provider + model.
+     */
+    private function runModelTest(AiModel $aiModel, AiTaskService $tasks, AiProviderClientFactory $clients, ProviderHealthService $health): RedirectResponse
     {
         $provider = $aiModel->provider;
-        $this->ensureAiProvider($provider);
-
         $client = $clients->make($provider);
 
         if ($client === null) {
             $result = new AiCompletionResult(false, error: 'Unsupported AI provider.');
         } else {
-            $result = $client->complete(
-                $aiModel,
-                'Reply with exactly OK.',
-                'You are a provider health check. Return only OK and no other text.',
-            );
+            $result = $tasks->test($aiModel);
         }
 
         $this->recordTestResult($provider, $result, $health);
+
+        if ($result->successful) {
+            $tasks->recordSuccess($aiModel, $result->latencyMs);
+        } else {
+            $tasks->recordFailure($aiModel, $result->error, $result->latencyMs);
+        }
 
         Inertia::flash('toast', [
             'type' => $result->successful ? 'success' : 'error',
@@ -247,14 +339,56 @@ class AiSettingsController extends Controller
      */
     private function modelAttributes(array $validated): array
     {
+        $endpoint = isset($validated['endpoint_url']) && trim((string) $validated['endpoint_url']) !== ''
+            ? trim((string) $validated['endpoint_url'])
+            : null;
+
         return [
             'api_provider_id' => $validated['api_provider_id'],
             'name' => $validated['name'],
             'model' => $validated['model'],
+            'task' => $validated['task'] ?? null,
+            'runtime' => $validated['runtime'] ?? null,
+            'endpoint_url' => $endpoint,
             'is_active' => $validated['is_active'] ?? true,
             'max_output_tokens' => $validated['max_output_tokens'],
             'temperature' => $validated['temperature'] ?? null,
         ];
+    }
+
+    /**
+     * @param  Collection<int, AiModel>  $models
+     * @return array<int, array<string, mixed>>
+     */
+    private function taskPayloads(Collection $models): array
+    {
+        $settings = AiTaskSetting::query()->get()->keyBy(fn (AiTaskSetting $s): string => $s->task->value);
+
+        return collect(AiTask::cases())->map(function (AiTask $task) use ($models, $settings): array {
+            $setting = $settings->get($task->value);
+            $activeId = $setting?->active_ai_model_id;
+            $candidates = $models->filter(fn (AiModel $m): bool => $m->task === $task);
+            $active = $candidates->firstWhere('id', $activeId);
+
+            return [
+                'task' => $task->value,
+                'label' => $task->label(),
+                'default_runtime' => $task->defaultRuntime()->value,
+                'enabled' => (bool) ($setting?->enabled ?? false),
+                'active_ai_model_id' => $activeId,
+                'fallback_behavior' => $setting?->fallback_behavior,
+                'status' => $active?->status->value,
+                'status_label' => $active?->status->label(),
+                'status_color' => $active?->status->color(),
+                'last_error' => $active?->last_error,
+                'last_latency_ms' => $active?->last_latency_ms,
+                'last_checked_at' => $active?->last_checked_at?->diffForHumans(),
+                'models' => $candidates->map(fn (AiModel $m): array => [
+                    'value' => $m->id,
+                    'label' => "{$m->provider->name} / {$m->name}",
+                ])->values()->all(),
+            ];
+        })->all();
     }
 
     /**
@@ -284,7 +418,16 @@ class AiSettingsController extends Controller
                     'api_provider_id' => $model->api_provider_id,
                     'name' => $model->name,
                     'model' => $model->model,
+                    'task' => $model->task?->value,
+                    'runtime' => $model->runtime?->value,
+                    'endpoint_url' => $model->endpoint_url,
                     'is_active' => $model->is_active,
+                    'status' => $model->status->value,
+                    'status_label' => $model->status->label(),
+                    'status_color' => $model->status->color(),
+                    'last_error' => $model->last_error,
+                    'last_latency_ms' => $model->last_latency_ms,
+                    'last_checked_at' => $model->last_checked_at?->diffForHumans(),
                     'max_output_tokens' => $model->max_output_tokens,
                     'temperature' => $model->temperature,
                     'is_selected' => $model->id === $activeModelId,

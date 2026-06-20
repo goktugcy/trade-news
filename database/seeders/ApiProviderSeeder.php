@@ -54,6 +54,9 @@ class ApiProviderSeeder extends Seeder
             ['key' => 'grok', 'name' => 'Grok / xAI', 'type' => ProviderType::Ai,
                 'base_url' => 'https://api.x.ai/v1', 'priority' => 130, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 30, 'fetch_limit' => 50,
                 'markets' => null, 'capabilities' => ['summaries'], 'auto_sync_stocks' => false, 'is_active' => false],
+            ['key' => 'huggingface', 'name' => 'Hugging Face', 'type' => ProviderType::Ai,
+                'base_url' => null, 'priority' => 90, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 30, 'fetch_limit' => 50,
+                'markets' => null, 'capabilities' => ['summaries', 'sentiment', 'entities', 'embeddings', 'reranking', 'analysis'], 'auto_sync_stocks' => false, 'is_active' => false],
         ];
 
         foreach ($providers as $provider) {
