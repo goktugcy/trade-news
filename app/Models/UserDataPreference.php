@@ -7,14 +7,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property int $user_id
  * @property int $auto_refresh_seconds
+ * @property array<int, string>|null $preferred_markets
+ * @property Carbon|null $onboarding_completed_at
  * @property-read User $user
  */
-#[Fillable(['user_id', 'auto_refresh_seconds'])]
+#[Fillable(['user_id', 'auto_refresh_seconds', 'preferred_markets', 'onboarding_completed_at'])]
 class UserDataPreference extends Model
 {
     public const DEFAULT_AUTO_REFRESH_SECONDS = 60;
@@ -31,6 +34,8 @@ class UserDataPreference extends Model
     {
         return [
             'auto_refresh_seconds' => 'integer',
+            'preferred_markets' => 'array',
+            'onboarding_completed_at' => 'datetime',
         ];
     }
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Search, SlidersHorizontal } from '@lucide/vue';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import EmptyState from '@/components/tradenews/EmptyState.vue';
 import NewsFeed from '@/components/tradenews/NewsFeed.vue';
 import NewsSourcePicker from '@/components/tradenews/NewsSourcePicker.vue';
@@ -18,6 +19,7 @@ const props = defineProps<{
 }>();
 
 const showSources = ref(false);
+const { t } = useI18n();
 
 defineOptions({
     layout: { breadcrumbs: [{ title: 'News', href: '/news' }] },
@@ -45,16 +47,20 @@ watch(search, (value) => {
     debounce = setTimeout(() => apply({ q: value || null }), 350);
 });
 
-const marketTabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIST' }, { value: 'NASDAQ', label: 'NASDAQ' }];
+const marketTabs = computed(() => [
+    { value: 'ALL', label: t('common.all') },
+    { value: 'BIST', label: 'BIST' },
+    { value: 'NASDAQ', label: 'NASDAQ' },
+]);
 </script>
 
 <template>
-    <Head :title="scope === 'watchlist' ? 'Watchlist News' : 'All News'" />
+    <Head :title="scope === 'watchlist' ? t('news.watchlistNews') : t('news.title')" />
 
     <div class="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 p-4">
         <div class="flex flex-col gap-3">
             <h1 class="text-lg font-semibold text-foreground">
-                {{ scope === 'watchlist' ? 'Watchlist News' : 'All Market News' }}
+                {{ scope === 'watchlist' ? t('news.watchlistNews') : t('news.allMarketNews') }}
             </h1>
 
             <!-- Filter bar -->
@@ -80,7 +86,7 @@ const marketTabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIS
                         :class="showSources ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'"
                         @click="showSources = !showSources"
                     >
-                        <SlidersHorizontal class="size-3.5" /> Sources
+                        <SlidersHorizontal class="size-3.5" /> {{ t('common.sources') }}
                     </button>
 
                     <div class="ml-auto flex items-center gap-1.5">
@@ -90,7 +96,7 @@ const marketTabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIS
                             :class="!filters.sentiment ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'"
                             @click="apply({ sentiment: null })"
                         >
-                            Any
+                            {{ t('common.any') }}
                         </button>
                         <button
                             v-for="s in options.sentiments"
@@ -107,7 +113,7 @@ const marketTabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIS
 
                 <div class="relative">
                     <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input v-model="search" placeholder="Search headlines or symbols…" class="pl-9" />
+                    <Input v-model="search" :placeholder="t('news.searchPlaceholder')" class="pl-9" />
                 </div>
 
                 <NewsSourcePicker v-if="sources && showSources" :sources="sources" />
@@ -116,10 +122,10 @@ const marketTabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIS
 
         <EmptyState
             v-if="scope === 'watchlist' && watchlistEmpty"
-            title="Your watchlist is empty"
-            description="Add stocks to your watchlist to see news filtered to the companies you follow."
+            :title="t('news.watchlistEmpty')"
+            :description="t('news.watchlistEmptyDescription')"
         >
-            <Link href="/stocks" class="text-sm font-medium text-foreground hover:underline">Browse stocks →</Link>
+            <Link href="/stocks" class="text-sm font-medium text-foreground hover:underline">{{ t('news.browseStocks') }} →</Link>
         </EmptyState>
 
         <template v-else>
@@ -133,17 +139,17 @@ const marketTabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIS
                     preserve-scroll
                     class="rounded-md border border-sidebar-border/70 px-3 py-1.5 text-sm hover:bg-accent dark:border-sidebar-border"
                 >
-                    ← Newer
+                    ← {{ t('news.newer') }}
                 </Link>
                 <span v-else />
-                <span class="text-sm text-muted-foreground">Page {{ news.meta.current_page }} of {{ news.meta.last_page }}</span>
+                <span class="text-sm text-muted-foreground">{{ t('common.page', { current: news.meta.current_page, last: news.meta.last_page }) }}</span>
                 <Link
                     v-if="news.meta.next_page_url"
                     :href="news.meta.next_page_url"
                     preserve-scroll
                     class="rounded-md border border-sidebar-border/70 px-3 py-1.5 text-sm hover:bg-accent dark:border-sidebar-border"
                 >
-                    Older →
+                    {{ t('news.older') }} →
                 </Link>
                 <span v-else />
             </div>

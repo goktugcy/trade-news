@@ -1,4 +1,4 @@
-import type { Auth, DataPreferences } from '@/types';
+import type { Auth, DataPreferences, OnboardingState } from '@/types';
 
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {
@@ -18,7 +18,9 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
+            locale: 'en' | 'tr';
             dataPreferences: DataPreferences;
+            onboarding: OnboardingState;
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

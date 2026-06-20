@@ -12,6 +12,7 @@ enum AiRuntime: string
     case HfFeatureExtraction = 'hf_feature_extraction';
     case HfRanking = 'hf_ranking';
     case HfSummarization = 'hf_summarization';
+    case DeepLTranslation = 'deepl_translation';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum AiRuntime: string
             self::HfFeatureExtraction => 'HF feature extraction (embeddings)',
             self::HfRanking => 'HF ranking / reranker',
             self::HfSummarization => 'HF summarization',
+            self::DeepLTranslation => 'DeepL translation API',
         };
     }
 

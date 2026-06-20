@@ -68,6 +68,7 @@ it('renders the admin AI settings page and hides plaintext provider keys', funct
             ->component('admin/AiSettings')
             ->where('settings.enabled', true)
             ->where('settings.active_ai_model_id', $model->id)
+            ->where('providerOptions.5.key', 'deepl')
             ->where('providers.0.api_key_configured', true)
             ->missing('providers.0.api_key'));
 });

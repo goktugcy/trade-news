@@ -14,6 +14,7 @@ use App\Models\StockPrice;
 use App\Services\Ai\AiTaskService;
 use App\Services\MarketData\MarketDataIngestor;
 use App\Services\Providers\ApiProviderRegistry;
+use App\Services\Translation\ContentTranslationService;
 use App\Support\Presenters\NewsPresenter;
 use App\Support\Presenters\StockPresenter;
 use Carbon\CarbonImmutable;
@@ -47,7 +48,7 @@ class StockController extends Controller
      */
     public function index(Request $request): Response
     {
-        $market = $request->string('market')->upper()->toString();
+        $market = $this->selectedMarket($request);
         $search = trim($request->string('q')->toString());
         $watchlistIds = $request->user()->watchlist()->pluck('stock_id')->all();
 
@@ -86,12 +87,14 @@ class StockController extends Controller
 
         $uid = $request->user()->id;
         $disabledSourceIds = $request->user()->disabledNewsSources()->pluck('news_source_id');
+        $locale = $request->user()->locale;
 
         $relatedNews = $stock->news()
             ->where('is_matched', true)
             ->whereHas('source', fn (Builder $q) => $q->where('is_active', true))
             ->with([
-                'stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name',
+                'stocks:id,symbol,market', 'source:id,name,language', 'sources.source:id,name',
+                'translations' => fn ($q) => $q->where('locale', $locale),
                 'reactionForUser' => fn ($q) => $q->where('user_id', $uid),
                 'savedForUser' => fn ($q) => $q->where('user_id', $uid),
             ])
@@ -104,14 +107,16 @@ class StockController extends Controller
             ->limit(20)
             ->get();
 
+        app(ContentTranslationService::class)->queueNewsTranslations($relatedNews, $locale);
+
         return Inertia::render('stocks/Show', [
             'stock' => StockPresenter::row($stock->load('latestPrice'), [
                 'in_watchlist' => $watchlistEntry !== null,
                 'alerts_enabled' => $watchlistEntry !== null && $watchlistEntry->alerts_enabled,
                 'watchlist_id' => $watchlistEntry?->id,
             ]),
-            'news' => NewsPresenter::collection($relatedNews),
-            'analysis' => $this->analysisPayload($stock),
+            'news' => NewsPresenter::collection($relatedNews, $locale),
+            'analysis' => $this->analysisPayload($stock, $locale),
             'timeframes' => array_map(fn (Timeframe $t) => [
                 'value' => $t->value,
                 'label' => $t->label(),
@@ -126,15 +131,21 @@ class StockController extends Controller
      *
      * @return array<string, mixed>|null
      */
-    private function analysisPayload(Stock $stock): ?array
+    private function analysisPayload(Stock $stock, string $locale): ?array
     {
-        $analysis = $stock->latestAiAnalysis()->first();
+        $analysis = $stock->latestAiAnalysis()
+            ->with(['translations' => fn ($query) => $query->where('locale', $locale)])
+            ->first();
 
         $aiEnabled = app(AiTaskService::class)->isEnabled(AiTask::StockAnalysis);
 
         if ($analysis === null) {
             return null;
         }
+
+        app(ContentTranslationService::class)->queueStockAnalysisTranslation($analysis, $locale);
+
+        $translation = $analysis->translationFor($locale);
 
         return [
             'signal' => $analysis->signal->value,
@@ -146,10 +157,11 @@ class StockController extends Controller
             'estimated_price_high' => $analysis->estimated_price_high,
             'estimated_price' => $analysis->estimated_price,
             'currency' => $analysis->currency,
-            'summary' => $analysis->summary,
-            'drivers' => $analysis->drivers ?? [],
-            'risks' => $analysis->risks ?? [],
-            'disclaimer' => $analysis->disclaimer ?? StockAiAnalysis::DISCLAIMER,
+            'summary' => $translation?->summary ?: $analysis->summary,
+            'drivers' => $translation?->drivers ?: ($analysis->drivers ?? []),
+            'risks' => $translation?->risks ?: ($analysis->risks ?? []),
+            'disclaimer' => $translation?->disclaimer ?: ($analysis->disclaimer ?? StockAiAnalysis::DISCLAIMER),
+            'translation_locale' => $translation?->locale,
             'generated_at' => $analysis->generated_at?->diffForHumans(),
             'is_stale' => $analysis->isStale() || ! $aiEnabled,
             'ai_enabled' => $aiEnabled,
@@ -329,5 +341,22 @@ class StockController extends Controller
             '5y' => $now->subYears(5),
             default => null,
         };
+    }
+
+    private function selectedMarket(Request $request): string
+    {
+        $requested = $request->string('market')->upper()->toString();
+
+        if ($requested === 'ALL') {
+            return '';
+        }
+
+        if (in_array($requested, [Market::BIST->value, Market::NASDAQ->value], true)) {
+            return $requested;
+        }
+
+        $preferredMarkets = $request->user()->dataPreference?->preferred_markets ?? [];
+
+        return count($preferredMarkets) === 1 ? (string) $preferredMarkets[0] : '';
     }
 }

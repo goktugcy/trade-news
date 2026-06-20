@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Newspaper } from '@lucide/vue';
+import { useI18n } from 'vue-i18n';
 import EmptyState from '@/components/tradenews/EmptyState.vue';
 import NewsCard from '@/components/tradenews/NewsCard.vue';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,10 +15,12 @@ withDefaults(
     }>(),
     {
         loading: false,
-        emptyTitle: 'No news yet',
-        emptyDescription: 'News will appear here once the scheduled fetchers run.',
+        emptyTitle: undefined,
+        emptyDescription: undefined,
     },
 );
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -39,7 +42,7 @@ withDefaults(
         </template>
 
         <template v-else-if="news.length === 0">
-            <EmptyState :title="emptyTitle" :description="emptyDescription" :icon="Newspaper" />
+            <EmptyState :title="emptyTitle ?? t('news.noNews')" :description="emptyDescription ?? t('news.noNewsDescription')" :icon="Newspaper" />
         </template>
 
         <template v-else>

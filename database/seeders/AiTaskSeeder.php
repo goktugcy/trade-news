@@ -55,6 +55,23 @@ class AiTaskSeeder extends Seeder
             }
         }
 
+        $deepLProvider = ApiProvider::query()->where('key', 'deepl')->first();
+
+        if ($deepLProvider instanceof ApiProvider) {
+            AiModel::query()->updateOrCreate([
+                'api_provider_id' => $deepLProvider->id,
+                'task' => AiTask::Translation->value,
+                'model' => 'deepl-api',
+            ], [
+                'name' => 'DeepL Translate',
+                'runtime' => AiRuntime::DeepLTranslation->value,
+                'max_output_tokens' => 160,
+                'temperature' => null,
+                'endpoint_url' => null,
+                'is_active' => true,
+            ]);
+        }
+
         // One settings row per task (disabled by default; admin opts in).
         foreach (AiTask::cases() as $task) {
             AiTaskSetting::query()->firstOrCreate(['task' => $task->value], ['enabled' => false]);
@@ -76,6 +93,7 @@ class AiTaskSeeder extends Seeder
         return [
             ['task' => AiTask::Summary, 'name' => 'Qwen3 8B (summary)', 'model' => 'Qwen/Qwen3-8B', 'runtime' => AiRuntime::OpenAiChat, 'max_output_tokens' => 300, 'temperature' => 0.3],
             ['task' => AiTask::StockAnalysis, 'name' => 'Qwen3 8B (analysis)', 'model' => 'Qwen/Qwen3-8B', 'runtime' => AiRuntime::OpenAiChat, 'max_output_tokens' => 700, 'temperature' => 0.2],
+            ['task' => AiTask::Translation, 'name' => 'Qwen3 8B (translation)', 'model' => 'Qwen/Qwen3-8B', 'runtime' => AiRuntime::OpenAiChat, 'max_output_tokens' => 900, 'temperature' => 0.1],
             ['task' => AiTask::SentimentEn, 'name' => 'FinBERT (EN sentiment)', 'model' => 'ProsusAI/finbert', 'runtime' => AiRuntime::HfTextClassification],
             ['task' => AiTask::SentimentTr, 'name' => 'BERT TR sentiment', 'model' => 'saribasmetehan/bert-base-turkish-sentiment-analysis', 'runtime' => AiRuntime::HfTextClassification],
             ['task' => AiTask::EntityEn, 'name' => 'BERT base NER (EN)', 'model' => 'dslim/bert-base-NER', 'runtime' => AiRuntime::HfTokenClassification],

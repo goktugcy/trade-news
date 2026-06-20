@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Ai;
 
 use App\Models\ApiProvider;
+use App\Services\Translation\DeepLTranslator;
 
 class AiProviderClientFactory
 {
-    public const SUPPORTED_PROVIDER_KEYS = ['openai', 'anthropic', 'gemini', 'grok', 'huggingface'];
+    public const SUPPORTED_PROVIDER_KEYS = ['openai', 'anthropic', 'gemini', 'grok', 'huggingface', 'deepl'];
 
     public function make(ApiProvider $provider): ?AiProviderClientInterface
     {
@@ -18,6 +19,7 @@ class AiProviderClientFactory
             'gemini' => new GeminiGenerateContentClient,
             'grok' => new GrokResponsesClient,
             'huggingface' => new HuggingFaceEndpointClient,
+            'deepl' => new DeepLTranslator,
             default => null,
         };
     }
@@ -38,6 +40,7 @@ class AiProviderClientFactory
             ['key' => 'gemini', 'name' => 'Google Gemini', 'base_url' => 'https://generativelanguage.googleapis.com/v1beta'],
             ['key' => 'grok', 'name' => 'Grok / xAI', 'base_url' => 'https://api.x.ai/v1'],
             ['key' => 'huggingface', 'name' => 'Hugging Face', 'base_url' => ''],
+            ['key' => 'deepl', 'name' => 'DeepL', 'base_url' => 'https://api-free.deepl.com/v2'],
         ];
     }
 }

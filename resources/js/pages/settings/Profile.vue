@@ -2,6 +2,7 @@
 import { Form, Head, usePage } from '@inertiajs/vue3';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/DeleteUser.vue';
 import Heading from '@/components/Heading.vue';
@@ -27,18 +28,19 @@ defineProps<{ timezones: string[] }>();
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const { t } = useI18n();
 </script>
 
 <template>
-    <Head title="Profile settings" />
+    <Head :title="t('profile.title')" />
 
-    <h1 class="sr-only">Profile settings</h1>
+    <h1 class="sr-only">{{ t('profile.title') }}</h1>
 
     <div class="flex flex-col space-y-6">
         <Heading
             variant="small"
-            title="Profile"
-            description="Update your name, email address and timezone"
+            :title="t('profile.heading')"
+            :description="t('profile.description')"
         />
 
         <Form
@@ -47,7 +49,7 @@ const user = computed(() => page.props.auth.user);
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-2">
-                <Label for="name">Name</Label>
+                <Label for="name">{{ t('profile.name') }}</Label>
                 <Input
                     id="name"
                     class="mt-1 block w-full"
@@ -55,13 +57,13 @@ const user = computed(() => page.props.auth.user);
                     :default-value="user.name"
                     required
                     autocomplete="name"
-                    placeholder="Full name"
+                    :placeholder="t('profile.fullName')"
                 />
                 <InputError class="mt-2" :message="errors.name" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">{{ t('profile.email') }}</Label>
                 <Input
                     id="email"
                     type="email"
@@ -70,13 +72,13 @@ const user = computed(() => page.props.auth.user);
                     :default-value="user.email"
                     required
                     autocomplete="username"
-                    placeholder="Email address"
+                    :placeholder="t('profile.email')"
                 />
                 <InputError class="mt-2" :message="errors.email" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="timezone">Timezone</Label>
+                <Label for="timezone">{{ t('profile.timezone') }}</Label>
                 <select
                     id="timezone"
                     name="timezone"
@@ -87,20 +89,38 @@ const user = computed(() => page.props.auth.user);
                     <option v-for="tz in timezones" :key="tz" :value="tz">{{ tz }}</option>
                 </select>
                 <p class="text-xs text-muted-foreground">
-                    All news, market hours, charts and alerts are shown in this timezone.
+                    {{ t('profile.timezoneHelp') }}
                 </p>
                 <InputError class="mt-2" :message="errors.timezone" />
             </div>
 
+            <div class="grid gap-2">
+                <Label for="locale">{{ t('profile.language') }}</Label>
+                <select
+                    id="locale"
+                    name="locale"
+                    :value="user.locale ?? 'en'"
+                    required
+                    class="mt-1 block h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+                >
+                    <option value="en">{{ t('onboarding.english') }}</option>
+                    <option value="tr">{{ t('onboarding.turkish') }}</option>
+                </select>
+                <p class="text-xs text-muted-foreground">
+                    {{ t('profile.languageHelp') }}
+                </p>
+                <InputError class="mt-2" :message="errors.locale" />
+            </div>
+
             <div v-if="page.props.mustVerifyEmail && !user.email_verified_at">
                 <p class="-mt-4 text-sm text-muted-foreground">
-                    Your email address is unverified.
+                    {{ t('profile.unverified') }}
                     <Link
                         :href="send()"
                         as="button"
                         class="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                     >
-                        Click here to re-send the verification email.
+                        {{ t('profile.resend') }}
                     </Link>
                 </p>
 
@@ -108,13 +128,13 @@ const user = computed(() => page.props.auth.user);
                     v-if="page.props.status === 'verification-link-sent'"
                     class="mt-2 text-sm font-medium text-green-600"
                 >
-                    A new verification link has been sent to your email address.
+                    {{ t('profile.resent') }}
                 </div>
             </div>
 
             <div class="flex items-center gap-4">
                 <Button :disabled="processing" data-test="update-profile-button"
-                    >Save</Button
+                    >{{ t('common.save') }}</Button
                 >
             </div>
         </Form>

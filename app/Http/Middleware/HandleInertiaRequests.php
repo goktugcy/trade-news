@@ -43,6 +43,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'locale' => fn (): string => $request->user()?->locale ?: app()->getLocale(),
             'dataPreferences' => function () use ($request): array {
                 $preference = $request->user()?->dataPreference;
 
@@ -50,6 +51,21 @@ class HandleInertiaRequests extends Middleware
                     'auto_refresh_seconds' => $preference instanceof UserDataPreference
                         ? $preference->auto_refresh_seconds
                         : UserDataPreference::DEFAULT_AUTO_REFRESH_SECONDS,
+                    'preferred_markets' => $preference instanceof UserDataPreference
+                        ? $preference->preferred_markets
+                        : null,
+                ];
+            },
+            'onboarding' => function () use ($request): array {
+                $preference = $request->user()?->dataPreference;
+                $completedAt = $preference instanceof UserDataPreference
+                    ? $preference->onboarding_completed_at
+                    : null;
+
+                return [
+                    'completed' => $completedAt !== null,
+                    'should_show' => $request->user() !== null && $completedAt === null,
+                    'completed_at' => $completedAt?->toIso8601String(),
                 ];
             },
             // Scrolling top-bar ticker — read-only cache (warmed by the scheduler),

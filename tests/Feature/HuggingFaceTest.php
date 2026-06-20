@@ -52,6 +52,7 @@ it('seeds Hugging Face models without defaulting to the serverless Inference API
     $this->seed(AiTaskSeeder::class);
 
     expect(AiModel::query()->where('api_provider_id', $provider->id)->count())->toBeGreaterThan(0)
+        ->and(AiModel::query()->where('api_provider_id', $provider->id)->where('task', AiTask::Translation->value)->exists())->toBeTrue()
         ->and(AiModel::query()->where('api_provider_id', $provider->id)->whereNotNull('endpoint_url')->count())->toBe(0);
 });
 

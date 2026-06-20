@@ -14,13 +14,18 @@ class NewsPresenter
     /**
      * @return array<string, mixed>
      */
-    public static function card(NewsItem $item): array
+    public static function card(NewsItem $item, ?string $locale = null): array
     {
+        $translation = is_string($locale) ? $item->translationFor($locale) : null;
+        $summary = $translation?->summary ?: ($item->ai_summary ?: $item->summary);
+
         return [
             'id' => $item->id,
-            'title' => $item->title,
-            'summary' => $item->ai_summary ?: $item->summary,
+            'title' => $translation?->title ?: $item->title,
+            'summary' => $summary,
             'has_ai_summary' => $item->ai_summary !== null,
+            'has_translation' => $translation !== null,
+            'translation_locale' => $translation?->locale,
             'url' => $item->url,
             'image_url' => $item->image_url,
             'market' => $item->market?->value,
@@ -57,12 +62,12 @@ class NewsPresenter
      * @param  iterable<int, NewsItem>  $items
      * @return array<int, array<string, mixed>>
      */
-    public static function collection(iterable $items): array
+    public static function collection(iterable $items, ?string $locale = null): array
     {
         $out = [];
 
         foreach ($items as $item) {
-            $out[] = self::card($item);
+            $out[] = self::card($item, $locale);
         }
 
         return $out;

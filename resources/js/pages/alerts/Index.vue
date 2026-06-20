@@ -2,6 +2,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { Bell, Pencil, Plus, Trash2, TriangleAlert } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import EmptyState from '@/components/tradenews/EmptyState.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +52,7 @@ defineOptions({
 });
 
 const tab = ref<'stock' | 'news'>('stock');
+const { t } = useI18n();
 
 // ---------------- News rules (existing) ----------------
 const editingId = ref<number | null>(null);
@@ -140,18 +142,18 @@ function destroyStock(a: StockAlert) {
 </script>
 
 <template>
-    <Head title="Alerts" />
+    <Head :title="t('alerts.title')" />
 
     <div class="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 p-4">
-        <h1 class="text-lg font-semibold text-foreground">Alerts</h1>
+        <h1 class="text-lg font-semibold text-foreground">{{ t('alerts.title') }}</h1>
 
         <div
             v-if="!telegramConnected"
             class="flex items-center gap-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
         >
             <TriangleAlert class="size-5 shrink-0" />
-            <span>Connect Telegram to also receive alerts in chat (in-app notifications work regardless).
-                <Link href="/settings/telegram" class="font-medium underline">Connect →</Link>
+            <span>{{ t('alerts.telegramWarning') }}
+                <Link href="/settings/telegram" class="font-medium underline">{{ t('alerts.connect') }} →</Link>
             </span>
         </div>
 
@@ -162,13 +164,13 @@ function destroyStock(a: StockAlert) {
                 class="rounded-md px-3 py-1 text-sm font-medium transition-colors"
                 :class="tab === 'stock' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
                 @click="tab = 'stock'"
-            >Price &amp; volume</button>
+            >{{ t('alerts.priceVolume') }}</button>
             <button
                 type="button"
                 class="rounded-md px-3 py-1 text-sm font-medium transition-colors"
                 :class="tab === 'news' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
                 @click="tab = 'news'"
-            >News rules</button>
+            >{{ t('alerts.newsRules') }}</button>
         </div>
 
         <!-- ============ STOCK ALERTS TAB ============ -->

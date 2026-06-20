@@ -19,7 +19,18 @@ trait ProfileValidationRules
             'name' => $this->nameRules(),
             'email' => $this->emailRules($userId),
             'timezone' => $this->timezoneRules(),
+            'locale' => $this->localeRules(),
         ];
+    }
+
+    /**
+     * Get the validation rules used to validate the user's preferred locale.
+     *
+     * @return array<int, ValidationRule|array<mixed>|string>
+     */
+    protected function localeRules(): array
+    {
+        return ['sometimes', 'required', 'string', Rule::in(['en', 'tr'])];
     }
 
     /**

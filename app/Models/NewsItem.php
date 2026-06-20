@@ -40,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, NewsItemSource> $sources
  * @property-read NewsItemReaction|null $reactionForUser
  * @property-read SavedNewsItem|null $savedForUser
+ * @property-read Collection<int, NewsItemTranslation> $translations
  * @property-read int|null $likes_count
  * @property-read int|null $dislikes_count
  */
@@ -147,6 +148,25 @@ class NewsItem extends Model
     public function dislikes(): HasMany
     {
         return $this->hasMany(NewsItemReaction::class)->where('value', NewsItemReaction::DISLIKE);
+    }
+
+    /**
+     * Cached translations for this news item.
+     *
+     * @return HasMany<NewsItemTranslation, $this>
+     */
+    public function translations(): HasMany
+    {
+        return $this->hasMany(NewsItemTranslation::class);
+    }
+
+    public function translationFor(string $locale): ?NewsItemTranslation
+    {
+        if (! $this->relationLoaded('translations')) {
+            return null;
+        }
+
+        return $this->translations->firstWhere('locale', $locale);
     }
 
     /** @param  Builder<NewsItem>  $query */

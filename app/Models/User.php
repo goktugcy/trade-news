@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,6 +24,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $email
  * @property bool $is_admin
  * @property string $timezone
+ * @property string $locale
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $two_factor_secret
@@ -33,9 +35,9 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $updated_at
  * @property-read UserDataPreference|null $dataPreference
  */
-#[Fillable(['name', 'email', 'password', 'is_admin', 'timezone'])]
+#[Fillable(['name', 'email', 'password', 'is_admin', 'timezone', 'locale'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements PasskeyUser
+class User extends Authenticatable implements HasLocalePreference, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
@@ -58,6 +60,11 @@ class User extends Authenticatable implements PasskeyUser
     public function isAdmin(): bool
     {
         return (bool) $this->is_admin;
+    }
+
+    public function preferredLocale(): string
+    {
+        return $this->locale ?: 'en';
     }
 
     /**

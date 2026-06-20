@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Bell, BellOff, Plus, Search, Trash2 } from '@lucide/vue';
 import { ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import EmptyState from '@/components/tradenews/EmptyState.vue';
 import MarketBadge from '@/components/tradenews/MarketBadge.vue';
 import PriceChange from '@/components/tradenews/PriceChange.vue';
@@ -20,6 +21,7 @@ type SearchResult = { id: number; symbol: string; name: string; market: 'BIST' |
 const query = ref('');
 const results = ref<SearchResult[]>([]);
 const open = ref(false);
+const { t } = useI18n();
 
 let debounce: ReturnType<typeof setTimeout> | undefined;
 watch(query, (value) => {
@@ -65,16 +67,16 @@ function toggleAlert(item: StockRow) {
 </script>
 
 <template>
-    <Head title="Watchlist" />
+    <Head :title="t('watchlist.title')" />
 
     <div class="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 p-4">
-        <h1 class="text-lg font-semibold text-foreground">Manage Watchlist</h1>
+        <h1 class="text-lg font-semibold text-foreground">{{ t('watchlist.manage') }}</h1>
 
         <!-- Add box -->
         <div class="relative">
             <div class="relative">
                 <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input v-model="query" placeholder="Search a stock to add (e.g. AAPL, Aselsan)…" class="pl-9" @focus="open = results.length > 0" />
+                <Input v-model="query" :placeholder="t('watchlist.searchPlaceholder')" class="pl-9" @focus="open = results.length > 0" />
             </div>
             <ul
                 v-if="open && results.length > 0"
@@ -99,10 +101,10 @@ function toggleAlert(item: StockRow) {
 
         <EmptyState
             v-if="items.length === 0"
-            title="Your watchlist is empty"
-            description="Search above or browse the stock list to start following companies."
+            :title="t('watchlist.empty')"
+            :description="t('watchlist.emptyDescription')"
         >
-            <Link href="/stocks" class="text-sm font-medium text-foreground hover:underline">Browse stocks →</Link>
+            <Link href="/stocks" class="text-sm font-medium text-foreground hover:underline">{{ t('watchlist.browseStocks') }} →</Link>
         </EmptyState>
 
         <div v-else class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
@@ -125,7 +127,7 @@ function toggleAlert(item: StockRow) {
                         type="button"
                         class="rounded-md p-2 transition-colors hover:bg-accent"
                         :class="item.alerts_enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'"
-                        :title="item.alerts_enabled ? 'Alerts on' : 'Alerts off'"
+                        :title="item.alerts_enabled ? t('watchlist.alertsOn') : t('watchlist.alertsOff')"
                         @click="toggleAlert(item)"
                     >
                         <component :is="item.alerts_enabled ? Bell : BellOff" class="size-4" />
@@ -133,7 +135,7 @@ function toggleAlert(item: StockRow) {
                     <button
                         type="button"
                         class="rounded-md p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                        title="Remove"
+                        :title="t('watchlist.remove')"
                         @click="remove(item)"
                     >
                         <Trash2 class="size-4" />

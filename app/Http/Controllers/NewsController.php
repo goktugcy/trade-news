@@ -8,6 +8,7 @@ use App\Enums\Market;
 use App\Enums\Sentiment;
 use App\Models\NewsItem;
 use App\Models\NewsSource;
+use App\Services\Translation\ContentTranslationService;
 use App\Support\Presenters\NewsPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -22,7 +23,7 @@ class NewsController extends Controller
     public function index(Request $request): Response
     {
         return Inertia::render('news/Index', [
-            'news' => $this->paginate($this->baseQuery($request)),
+            'news' => $this->paginate($this->baseQuery($request), $request),
             'filters' => $this->filters($request),
             'options' => $this->filterOptions(),
             'scope' => 'all',
@@ -41,7 +42,7 @@ class NewsController extends Controller
             ->whereHas('stocks', fn (Builder $q) => $q->whereIn('stocks.id', $stockIds));
 
         return Inertia::render('news/Index', [
-            'news' => $this->paginate($query),
+            'news' => $this->paginate($query, $request),
             'filters' => $this->filters($request),
             'options' => $this->filterOptions(),
             'scope' => 'watchlist',
@@ -61,7 +62,7 @@ class NewsController extends Controller
             ->whereHas('savedForUser', fn (Builder $q) => $q->where('user_id', $uid));
 
         return Inertia::render('news/Saved', [
-            'news' => $this->paginate($query),
+            'news' => $this->paginate($query, $request),
             'filters' => $this->filters($request),
             'options' => $this->filterOptions(),
             'scope' => 'saved',
@@ -73,18 +74,20 @@ class NewsController extends Controller
      */
     private function baseQuery(Request $request): Builder
     {
-        $market = $request->string('market')->upper()->toString();
+        $market = $this->selectedMarket($request);
         $sentiment = $request->string('sentiment')->lower()->toString();
         $search = trim($request->string('q')->toString());
         $uid = $request->user()->id;
         $disabled = $request->user()->disabledNewsSources()->pluck('news_source_id');
+        $locale = $request->user()->locale;
 
         return NewsItem::query()
             ->where('is_matched', true)
             ->fromActiveSource()
             ->published()
             ->with([
-                'stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name',
+                'stocks:id,symbol,market', 'source:id,name,language', 'sources.source:id,name',
+                'translations' => fn ($q) => $q->where('locale', $locale),
                 'reactionForUser' => fn ($q) => $q->where('user_id', $uid),
                 'savedForUser' => fn ($q) => $q->where('user_id', $uid),
             ])
@@ -114,12 +117,16 @@ class NewsController extends Controller
      * @param  Builder<NewsItem>  $query
      * @return array<string, mixed>
      */
-    private function paginate(Builder $query): array
+    private function paginate(Builder $query, Request $request): array
     {
         $paginator = $query->paginate(15)->withQueryString();
+        $items = collect($paginator->items());
+        $locale = $request->user()->locale;
+
+        app(ContentTranslationService::class)->queueNewsTranslations($items, $locale);
 
         return [
-            'data' => NewsPresenter::collection($paginator->items()),
+            'data' => NewsPresenter::collection($items, $locale),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),
@@ -136,7 +143,7 @@ class NewsController extends Controller
     private function filters(Request $request): array
     {
         return [
-            'market' => $request->string('market')->upper()->toString() ?: 'ALL',
+            'market' => $this->selectedMarket($request) ?: 'ALL',
             'sentiment' => $request->string('sentiment')->lower()->toString() ?: null,
             'q' => trim($request->string('q')->toString()) ?: null,
         ];
@@ -177,5 +184,22 @@ class NewsController extends Controller
                 'enabled' => ! $disabled->contains($source->id),
             ])
             ->all();
+    }
+
+    private function selectedMarket(Request $request): string
+    {
+        $requested = $request->string('market')->upper()->toString();
+
+        if ($requested === 'ALL') {
+            return '';
+        }
+
+        if (in_array($requested, [Market::BIST->value, Market::NASDAQ->value], true)) {
+            return $requested;
+        }
+
+        $preferredMarkets = $request->user()->dataPreference?->preferred_markets ?? [];
+
+        return count($preferredMarkets) === 1 ? (string) $preferredMarkets[0] : '';
     }
 }

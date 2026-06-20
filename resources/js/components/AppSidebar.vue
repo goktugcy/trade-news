@@ -14,6 +14,7 @@ import {
     TrendingUp,
 } from '@lucide/vue';
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavThemeToggle from '@/components/NavThemeToggle.vue';
@@ -30,25 +31,28 @@ import {
 import type { NavItem } from '@/types';
 
 const page = usePage();
+const { t } = useI18n();
 const isAdmin = computed(() => page.props.auth?.user?.is_admin === true);
 
-const mainNavItems: NavItem[] = [
-    { title: 'Dashboard', href: '/dashboard', icon: LayoutGrid },
-    { title: 'All News', href: '/news', icon: Newspaper },
-    { title: 'Watchlist News', href: '/news/watchlist', icon: Star },
-    { title: 'Saved News', href: '/news/saved', icon: Bookmark },
-    { title: 'Stocks', href: '/stocks', icon: TrendingUp },
-    { title: 'Watchlist', href: '/watchlist', icon: ListChecks },
-    { title: 'Alerts', href: '/alerts', icon: Bell },
-    { title: 'Notifications', href: '/notifications', icon: Inbox },
-];
+const mainNavItems = computed<NavItem[]>(() => [
+    { title: t('nav.dashboard'), href: '/dashboard', icon: LayoutGrid },
+    { title: t('nav.allNews'), href: '/news', icon: Newspaper },
+    { title: t('nav.watchlistNews'), href: '/news/watchlist', icon: Star },
+    { title: t('nav.savedNews'), href: '/news/saved', icon: Bookmark },
+    { title: t('nav.stocks'), href: '/stocks', icon: TrendingUp },
+    { title: t('nav.watchlist'), href: '/watchlist', icon: ListChecks },
+    { title: t('nav.alerts'), href: '/alerts', icon: Bell },
+    { title: t('nav.notifications'), href: '/notifications', icon: Inbox },
+]);
 
-const settingsNavItems: NavItem[] = [
-    { title: 'Telegram', href: '/settings/telegram', icon: Send },
-    { title: 'Settings', href: '/settings/profile', icon: Settings2 },
-];
+const settingsNavItems = computed<NavItem[]>(() => [
+    { title: t('nav.telegram'), href: '/settings/telegram', icon: Send },
+    { title: t('nav.settings'), href: '/settings/profile', icon: Settings2 },
+]);
 
-const adminNavItems: NavItem[] = [{ title: 'Admin', href: '/admin', icon: Shield }];
+const adminNavItems = computed<NavItem[]>(() => [
+    { title: t('nav.admin'), href: '/admin', icon: Shield },
+]);
 </script>
 
 <template>
@@ -66,9 +70,9 @@ const adminNavItems: NavItem[] = [{ title: 'Admin', href: '/admin', icon: Shield
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" label="Platform" />
-            <NavMain :items="settingsNavItems" label="Account" />
-            <NavMain v-if="isAdmin" :items="adminNavItems" label="Administration" />
+            <NavMain :items="mainNavItems" :label="t('nav.platform')" />
+            <NavMain :items="settingsNavItems" :label="t('nav.account')" />
+            <NavMain v-if="isAdmin" :items="adminNavItems" :label="t('nav.administration')" />
         </SidebarContent>
 
         <SidebarFooter>

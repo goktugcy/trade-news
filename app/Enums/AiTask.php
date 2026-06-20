@@ -14,6 +14,7 @@ enum AiTask: string
     case Embedding = 'embedding';
     case Reranker = 'reranker';
     case StockAnalysis = 'stock_analysis';
+    case Translation = 'translation';
 
     public function label(): string
     {
@@ -26,13 +27,14 @@ enum AiTask: string
             self::Embedding => 'Embedding / entity linking',
             self::Reranker => 'Reranking',
             self::StockAnalysis => 'Stock forecast / signal',
+            self::Translation => 'Translation',
         };
     }
 
     public function defaultRuntime(): AiRuntime
     {
         return match ($this) {
-            self::Summary, self::StockAnalysis => AiRuntime::OpenAiChat,
+            self::Summary, self::StockAnalysis, self::Translation => AiRuntime::OpenAiChat,
             self::SentimentTr, self::SentimentEn => AiRuntime::HfTextClassification,
             self::EntityTr, self::EntityEn => AiRuntime::HfTokenClassification,
             self::Embedding => AiRuntime::HfFeatureExtraction,

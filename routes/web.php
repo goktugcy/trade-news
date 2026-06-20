@@ -6,6 +6,7 @@ use App\Http\Controllers\NewsInteractionController;
 use App\Http\Controllers\NewsSourcePreferenceController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationRuleController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\StockAlertController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\WatchlistController;
@@ -29,6 +30,7 @@ Route::post('telegram/webhook/{secret}', TelegramWebhookController::class)
 */
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::put('onboarding/preferences', [OnboardingController::class, 'update'])->name('onboarding.preferences.update');
 
     // News feeds (static routes before the {newsItem} wildcard)
     Route::get('news', [NewsController::class, 'index'])->name('news.index');

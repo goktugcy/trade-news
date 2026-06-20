@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { ExternalLink, Flame } from '@lucide/vue';
+import { useI18n } from 'vue-i18n';
 import NewsCardActions from '@/components/tradenews/NewsCardActions.vue';
 import SentimentBadge from '@/components/tradenews/SentimentBadge.vue';
 import { useUserTimezone } from '@/composables/useUserTimezone';
@@ -9,6 +10,7 @@ import type { NewsCardData } from '@/types';
 defineProps<{ news: NewsCardData }>();
 
 const { relative, dateTime } = useUserTimezone();
+const { t } = useI18n();
 </script>
 
 <template>
@@ -40,7 +42,7 @@ const { relative, dateTime } = useUserTimezone();
                         <span
                             v-if="news.source_count > 1"
                             class="ml-1 rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-foreground"
-                        >+{{ news.source_count - 1 }} more</span>
+                        >{{ t('news.moreSources', { count: news.source_count - 1 }) }}</span>
                     </span>
                     <span
                         v-if="news.published_at"
@@ -55,7 +57,7 @@ const { relative, dateTime } = useUserTimezone();
                         v-if="news.importance >= 50"
                         class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
                     >
-                        <Flame class="size-3" /> High impact
+                        <Flame class="size-3" /> {{ t('news.highImpact') }}
                     </span>
                 </div>
 
@@ -97,7 +99,7 @@ const { relative, dateTime } = useUserTimezone();
                         rel="noopener noreferrer"
                         class="ml-auto inline-flex items-center gap-1 text-xs text-foreground/70 hover:text-foreground"
                     >
-                        Read <ExternalLink class="size-3" />
+                        {{ t('common.read') }} <ExternalLink class="size-3" />
                     </a>
                 </div>
 

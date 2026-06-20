@@ -129,7 +129,7 @@ class AiSettingsController extends Controller
             'type' => ProviderType::Ai,
             'status' => ProviderStatus::Unknown,
             'markets' => [],
-            'capabilities' => ['summaries'],
+            'capabilities' => $this->capabilitiesForProviderKey((string) $validated['key']),
             'fetch_limit' => 50,
             'auto_sync_stocks' => false,
             'last_checked_at' => null,
@@ -534,5 +534,17 @@ class AiSettingsController extends Controller
     private function ensureAiProvider(ApiProvider $provider): void
     {
         abort_unless($provider->type === ProviderType::Ai, 404);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function capabilitiesForProviderKey(string $key): array
+    {
+        return match ($key) {
+            'deepl' => ['translation'],
+            'huggingface' => ['summaries', 'sentiment', 'entities', 'embeddings', 'reranking', 'analysis', 'translation'],
+            default => ['summaries', 'analysis', 'translation'],
+        };
     }
 }

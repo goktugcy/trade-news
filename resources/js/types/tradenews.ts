@@ -12,6 +12,8 @@ export type NewsCardData = {
     title: string;
     summary: string | null;
     has_ai_summary: boolean;
+    has_translation: boolean;
+    translation_locale: 'en' | 'tr' | null;
     url: string | null;
     image_url: string | null;
     market: Market | null;
@@ -71,6 +73,13 @@ export type Candle = {
 
 export type DataPreferences = {
     auto_refresh_seconds: number;
+    preferred_markets: Market[] | null;
+};
+
+export type OnboardingState = {
+    completed: boolean;
+    should_show: boolean;
+    completed_at: string | null;
 };
 
 export type MarketSessionValue = 'open' | 'closed' | 'pre_market' | 'after_hours' | 'holiday' | 'weekend';

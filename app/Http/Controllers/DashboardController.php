@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\Market;
 use App\Models\NewsItem;
+use App\Models\NewsSource;
 use App\Models\Watchlist;
 use App\Services\Market\MarketSessionService;
 use App\Services\MarketData\MarketSummaryService;
+use App\Services\Translation\ContentTranslationService;
 use App\Support\Presenters\NewsPresenter;
 use App\Support\Presenters\StockPresenter;
 use Illuminate\Http\Request;
@@ -22,13 +25,16 @@ class DashboardController extends Controller
 
         $watchlistStockIds = $user->watchlist()->pluck('stock_id');
         $disabledSourceIds = $user->disabledNewsSources()->pluck('news_source_id');
+        $preferredMarkets = $user->dataPreference?->preferred_markets ?? [];
+        $locale = $user->locale;
 
         $feed = NewsItem::query()
             ->where('is_matched', true)
             ->fromActiveSource()
             ->published()
             ->with([
-                'stocks:id,symbol,market', 'source:id,name', 'sources.source:id,name',
+                'stocks:id,symbol,market', 'source:id,name,language', 'sources.source:id,name',
+                'translations' => fn ($q) => $q->where('locale', $locale),
                 'reactionForUser' => fn ($q) => $q->where('user_id', $user->id),
                 'savedForUser' => fn ($q) => $q->where('user_id', $user->id),
             ])
@@ -37,8 +43,14 @@ class DashboardController extends Controller
                 $disabledSourceIds->isNotEmpty(),
                 fn ($q) => $q->whereNotIn('source_id', $disabledSourceIds),
             )
+            ->when(
+                $preferredMarkets !== [],
+                fn ($q) => $q->whereIn('market', $preferredMarkets),
+            )
             ->limit(12)
             ->get();
+
+        app(ContentTranslationService::class)->queueNewsTranslations($feed, $locale);
 
         $watchlist = $user->watchlist()
             ->with('stock.latestPrice')
@@ -62,11 +74,15 @@ class DashboardController extends Controller
             ]);
 
         return Inertia::render('Dashboard', [
-            'feed' => NewsPresenter::collection($feed),
+            'feed' => NewsPresenter::collection($feed, $locale),
             'watchlist' => $watchlist,
             'topMovers' => $summary->cachedTopMovers(),
             'marketStatus' => $sessions->all($user->timezone),
             'latestAlerts' => $latestAlerts,
+            'onboardingOptions' => [
+                'sources' => $this->sourceOptions($request),
+                'markets' => Market::options(),
+            ],
             'stats' => [
                 'watchlist_count' => $watchlistStockIds->count(),
                 'matched_news_today' => NewsItem::query()
@@ -76,5 +92,25 @@ class DashboardController extends Controller
                     ->count(),
             ],
         ]);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function sourceOptions(Request $request): array
+    {
+        $disabled = $request->user()->disabledNewsSources()->pluck('news_source_id');
+
+        return NewsSource::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'language'])
+            ->map(fn (NewsSource $source) => [
+                'id' => $source->id,
+                'name' => $source->name,
+                'language' => $source->language,
+                'enabled' => ! $disabled->contains($source->id),
+            ])
+            ->all();
     }
 }

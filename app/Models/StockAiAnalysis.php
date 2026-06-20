@@ -6,8 +6,10 @@ namespace App\Models;
 
 use App\Enums\StockSignal;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -32,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $expires_at
  * @property-read Stock $stock
  * @property-read AiModel|null $aiModel
+ * @property-read Collection<int, StockAiAnalysisTranslation> $translations
  */
 class StockAiAnalysis extends Model
 {
@@ -88,6 +91,23 @@ class StockAiAnalysis extends Model
     public function aiModel(): BelongsTo
     {
         return $this->belongsTo(AiModel::class);
+    }
+
+    /**
+     * @return HasMany<StockAiAnalysisTranslation, $this>
+     */
+    public function translations(): HasMany
+    {
+        return $this->hasMany(StockAiAnalysisTranslation::class);
+    }
+
+    public function translationFor(string $locale): ?StockAiAnalysisTranslation
+    {
+        if (! $this->relationLoaded('translations')) {
+            return null;
+        }
+
+        return $this->translations->firstWhere('locale', $locale);
     }
 
     public function isStale(): bool

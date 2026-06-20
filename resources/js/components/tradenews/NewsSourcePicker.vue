@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
+import NewsSourcePreferenceController from '@/actions/App/Http/Controllers/NewsSourcePreferenceController';
 import type { NewsSourcePref } from '@/types';
 
 defineProps<{ sources: NewsSourcePref[] }>();
+
+const { t } = useI18n();
 
 function toggle(source: NewsSourcePref, enabled: boolean) {
     // Optimistically flip the checkbox; reload only the feed (skip ticker/options).
     source.enabled = enabled;
     router.patch(
-        `/news/sources/${source.id}`,
+        NewsSourcePreferenceController.update.url(source.id),
         { enabled },
         {
             preserveScroll: true,
@@ -25,7 +29,7 @@ function toggle(source: NewsSourcePref, enabled: boolean) {
 <template>
     <div class="rounded-lg border border-sidebar-border/70 bg-background p-3 dark:border-sidebar-border">
         <p class="mb-2 text-xs font-medium text-muted-foreground">
-            Choose which sources appear in your feed.
+            {{ t('news.sourceHelp') }}
         </p>
         <div class="grid grid-cols-1 gap-1 sm:grid-cols-2">
             <label
@@ -48,6 +52,6 @@ function toggle(source: NewsSourcePref, enabled: boolean) {
                 </span>
             </label>
         </div>
-        <p v-if="!sources.length" class="text-sm text-muted-foreground">No sources configured.</p>
+        <p v-if="!sources.length" class="text-sm text-muted-foreground">{{ t('common.noSources') }}</p>
     </div>
 </template>

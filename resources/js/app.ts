@@ -1,5 +1,6 @@
-import { createInertiaApp } from '@inertiajs/vue3';
+import { createInertiaApp, router } from '@inertiajs/vue3';
 import { initializeTheme } from '@/composables/useAppearance';
+import { i18n, normalizeLocale } from '@/i18n';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
@@ -24,6 +25,14 @@ createInertiaApp({
     progress: {
         color: '#4B5563',
     },
+    withApp(app, { page }) {
+        i18n.global.locale.value = normalizeLocale(page.props.locale);
+        app.use(i18n);
+    },
+});
+
+router.on('navigate', (event) => {
+    i18n.global.locale.value = normalizeLocale(event.detail.page.props.locale);
 });
 
 // This will set light / dark mode on page load...

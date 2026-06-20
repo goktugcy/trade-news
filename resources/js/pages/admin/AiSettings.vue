@@ -203,6 +203,8 @@ const modelForm = useForm<ModelForm>({
 
 // Editable local copies of each task row (committed via saveTask).
 const taskRows = ref<AiTaskRow[]>(props.tasks.map((row) => ({ ...row })));
+const translationTask = computed<AiTaskRow | null>(() => taskRows.value.find((row) => row.task === 'translation') ?? null);
+const taskRowsWithoutTranslation = computed<AiTaskRow[]>(() => taskRows.value.filter((row) => row.task !== 'translation'));
 
 watch(
     () => props.tasks,
@@ -229,6 +231,24 @@ function testTaskConnection(row: AiTaskRow) {
 
 function setFallback(row: AiTaskRow, value: string | number) {
     row.fallback_behavior = String(value) || null;
+}
+
+function saveTranslationTask() {
+    if (translationTask.value) {
+        saveTask(translationTask.value);
+    }
+}
+
+function testTranslationTaskConnection() {
+    if (translationTask.value) {
+        testTaskConnection(translationTask.value);
+    }
+}
+
+function setTranslationFallback(value: string | number) {
+    if (translationTask.value) {
+        setFallback(translationTask.value, value);
+    }
 }
 
 const modelTemperature = computed<string | number>({
@@ -390,7 +410,7 @@ function testConnection(model: AiModel) {
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h1 class="text-lg font-semibold text-foreground">AI Settings</h1>
-                <p class="mt-1 text-sm text-muted-foreground">Manage AI providers, per-task models, and Hugging Face dedicated endpoints.</p>
+                <p class="mt-1 text-sm text-muted-foreground">Manage AI providers, per-task models, translation, and provider endpoints.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" @click="openModelCreate()">
@@ -452,6 +472,68 @@ function testConnection(model: AiModel) {
             </div>
         </form>
 
+        <section v-if="translationTask" class="rounded-lg border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-sm font-semibold text-foreground">Translation settings</h2>
+                        <span v-if="translationTask.status" class="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                            <span class="size-2 rounded-full" :class="dotClass(translationTask.status_color ?? 'slate')" />
+                            {{ translationTask.status_label }}
+                            <span v-if="translationTask.last_latency_ms !== null">· {{ translationTask.last_latency_ms }} ms</span>
+                        </span>
+                    </div>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Use the Hugging Face multilingual/chat model for cached UI translations. DeepL stays available here as a secondary provider option.
+                    </p>
+                    <p v-if="translationTask.last_error" class="mt-2 max-w-3xl break-all text-xs text-rose-600 dark:text-rose-400">{{ translationTask.last_error }}</p>
+                </div>
+
+                <div class="flex flex-wrap gap-2 lg:justify-end">
+                    <Button type="button" size="sm" variant="outline" :disabled="translationTask.active_ai_model_id === null" @click="testTranslationTaskConnection">
+                        <Play class="size-4" />
+                        Test
+                    </Button>
+                    <Button type="button" size="sm" @click="saveTranslationTask">
+                        <Save class="size-4" />
+                        Save
+                    </Button>
+                </div>
+            </div>
+
+            <div class="mt-4 grid gap-3 lg:grid-cols-[auto_minmax(0,1fr)_minmax(10rem,14rem)] lg:items-end">
+                <label class="inline-flex h-9 items-center gap-2 text-sm font-medium text-foreground">
+                    <input v-model="translationTask.enabled" type="checkbox" class="size-4 rounded border-input accent-primary" @change="saveTranslationTask" />
+                    Translation enabled
+                </label>
+
+                <div class="space-y-1.5">
+                    <Label for="translation-model">Translation model</Label>
+                    <select
+                        id="translation-model"
+                        v-model="translationTask.active_ai_model_id"
+                        class="border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] dark:bg-input/30"
+                        @change="saveTranslationTask"
+                    >
+                        <option :value="null">No translation model</option>
+                        <option v-for="option in translationTask.models" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                </div>
+
+                <div class="space-y-1.5">
+                    <Label for="translation-fallback">Fallback</Label>
+                    <Input
+                        id="translation-fallback"
+                        :model-value="translationTask.fallback_behavior ?? ''"
+                        class="h-9"
+                        placeholder="original"
+                        @update:model-value="setTranslationFallback"
+                        @blur="saveTranslationTask"
+                    />
+                </div>
+            </div>
+        </section>
+
         <!-- Task matrix -->
         <section class="rounded-lg border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
             <h2 class="text-sm font-semibold text-foreground">AI tasks</h2>
@@ -470,7 +552,7 @@ function testConnection(model: AiModel) {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
-                        <tr v-for="row in taskRows" :key="row.task">
+                        <tr v-for="row in taskRowsWithoutTranslation" :key="row.task">
                             <td class="px-2 py-2">
                                 <div class="font-medium text-foreground">{{ row.label }}</div>
                                 <div v-if="row.last_error" class="mt-0.5 max-w-[16rem] truncate text-[11px] text-rose-600 dark:text-rose-400" :title="row.last_error">{{ row.last_error }}</div>
@@ -774,7 +856,7 @@ function testConnection(model: AiModel) {
                     </div>
 
                     <div class="space-y-1.5">
-                        <Label for="ai-model-endpoint">Endpoint URL <span class="text-muted-foreground">(Hugging Face dedicated endpoint)</span></Label>
+                        <Label for="ai-model-endpoint">Endpoint URL <span class="text-muted-foreground">(optional model override)</span></Label>
                         <Input id="ai-model-endpoint" v-model="modelForm.endpoint_url" type="url" autocomplete="off" placeholder="https://xxxx.endpoints.huggingface.cloud" :aria-invalid="Boolean(modelForm.errors.endpoint_url)" />
                         <p v-if="modelForm.errors.endpoint_url" class="text-xs text-destructive">{{ modelForm.errors.endpoint_url }}</p>
                     </div>

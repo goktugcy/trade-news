@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { Bell, ListChecks, Newspaper } from '@lucide/vue';
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import MarketSummaryPanel from '@/components/tradenews/MarketSummaryPanel.vue';
 import NewsFeed from '@/components/tradenews/NewsFeed.vue';
+import OnboardingWizard from '@/components/tradenews/OnboardingWizard.vue';
 import StatCard from '@/components/tradenews/StatCard.vue';
 import WatchlistPanel from '@/components/tradenews/WatchlistPanel.vue';
-import type { MarketStatusInfo, NewsCardData, StockRow } from '@/types';
+import type { MarketStatusInfo, NewsCardData, NewsSourcePref, SelectOption, StockRow } from '@/types';
 
 defineProps<{
     feed: NewsCardData[];
@@ -13,36 +16,47 @@ defineProps<{
     topMovers: { gainers: StockRow[]; losers: StockRow[] };
     marketStatus: MarketStatusInfo[];
     latestAlerts: Array<{ id: number; title: string; status: string; channel: string; sent_at: string | null; created_at: string | null }>;
+    onboardingOptions: { sources: NewsSourcePref[]; markets: SelectOption[] };
     stats: { watchlist_count: number; matched_news_today: number };
 }>();
 
 defineOptions({
     layout: { breadcrumbs: [{ title: 'Dashboard', href: '/dashboard' }] },
 });
+
+const page = usePage();
+const { t } = useI18n();
+const shouldShowOnboarding = computed(() => page.props.onboarding?.should_show === true);
 </script>
 
 <template>
-    <Head title="Dashboard" />
+    <Head :title="t('dashboard.title')" />
 
     <div class="flex flex-1 flex-col gap-4 p-4">
+        <OnboardingWizard
+            v-if="shouldShowOnboarding"
+            :sources="onboardingOptions.sources"
+            :markets="onboardingOptions.markets"
+        />
+
         <!-- Stat row -->
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <StatCard label="Watchlist" :value="stats.watchlist_count" :icon="ListChecks" hint="Stocks you follow" />
-            <StatCard label="Matched news today" :value="stats.matched_news_today" :icon="Newspaper" hint="Across all markets" />
-            <StatCard label="Recent alerts" :value="latestAlerts.length" :icon="Bell" hint="Last delivered" />
+            <StatCard :label="t('dashboard.watchlist')" :value="stats.watchlist_count" :icon="ListChecks" :hint="t('dashboard.stocksYouFollow')" />
+            <StatCard :label="t('dashboard.matchedNewsToday')" :value="stats.matched_news_today" :icon="Newspaper" :hint="t('dashboard.acrossAllMarkets')" />
+            <StatCard :label="t('dashboard.recentAlerts')" :value="latestAlerts.length" :icon="Bell" :hint="t('dashboard.lastDelivered')" />
         </div>
 
         <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             <!-- Center feed -->
             <div class="flex flex-col gap-3">
                 <div class="flex items-center justify-between">
-                    <h1 class="text-lg font-semibold text-foreground">Latest Market News</h1>
-                    <Link href="/news" class="text-sm text-muted-foreground hover:text-foreground">View all →</Link>
+                    <h1 class="text-lg font-semibold text-foreground">{{ t('dashboard.latestMarketNews') }}</h1>
+                    <Link href="/news" class="text-sm text-muted-foreground hover:text-foreground">{{ t('dashboard.viewAll') }} →</Link>
                 </div>
                 <NewsFeed
                     :news="feed"
-                    empty-title="No matched news yet"
-                    empty-description="Run the news fetcher (php artisan tradenews:fetch-news) or seed demo data."
+                    :empty-title="t('dashboard.noMatchedNews')"
+                    :empty-description="t('dashboard.noMatchedNewsDescription')"
                 />
             </div>
 
@@ -53,11 +67,11 @@ defineOptions({
 
                 <section class="rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
                     <header class="flex items-center justify-between border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
-                        <h2 class="text-sm font-semibold text-foreground">Latest Alerts</h2>
-                        <Link href="/alerts" class="text-xs text-muted-foreground hover:text-foreground">Rules</Link>
+                        <h2 class="text-sm font-semibold text-foreground">{{ t('dashboard.latestAlerts') }}</h2>
+                        <Link href="/alerts" class="text-xs text-muted-foreground hover:text-foreground">{{ t('dashboard.rules') }}</Link>
                     </header>
                     <div v-if="latestAlerts.length === 0" class="px-4 py-6 text-center text-sm text-muted-foreground">
-                        No alerts delivered yet.
+                        {{ t('dashboard.noAlerts') }}
                     </div>
                     <ul v-else class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
                         <li v-for="alert in latestAlerts" :key="alert.id" class="px-4 py-2.5">

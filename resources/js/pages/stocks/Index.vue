@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Plus, Search, Star } from '@lucide/vue';
 import { ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import MarketBadge from '@/components/tradenews/MarketBadge.vue';
 import PriceChange from '@/components/tradenews/PriceChange.vue';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ defineOptions({
 });
 
 const search = ref(props.filters.q ?? '');
+const { t } = useI18n();
 
 function apply(overrides: Record<string, string | null>) {
     const query: Record<string, string> = {};
@@ -39,14 +41,14 @@ function addToWatchlist(stock: StockRow) {
     router.post('/watchlist', { stock_id: stock.id }, { preserveScroll: true });
 }
 
-const tabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIST' }, { value: 'NASDAQ', label: 'NASDAQ' }];
+const tabs = [{ value: 'ALL', label: t('common.all') }, { value: 'BIST', label: 'BIST' }, { value: 'NASDAQ', label: 'NASDAQ' }];
 </script>
 
 <template>
-    <Head title="Stocks" />
+    <Head :title="t('stocks.title')" />
 
     <div class="mx-auto flex w-full flex-1 flex-col gap-4 p-4">
-        <h1 class="text-lg font-semibold text-foreground">Stocks</h1>
+        <h1 class="text-lg font-semibold text-foreground">{{ t('stocks.title') }}</h1>
 
         <div class="flex flex-col gap-3 rounded-xl border border-sidebar-border/70 bg-card p-3 sm:flex-row sm:items-center dark:border-sidebar-border">
             <div class="inline-flex rounded-lg bg-muted p-0.5">
@@ -63,7 +65,7 @@ const tabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIST' }, 
             </div>
             <div class="relative flex-1">
                 <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input v-model="search" placeholder="Search symbol or name…" class="pl-9" />
+                <Input v-model="search" :placeholder="t('stocks.searchPlaceholder')" class="pl-9" />
             </div>
         </div>
 
@@ -71,11 +73,11 @@ const tabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIST' }, 
             <table class="w-full text-sm">
                 <thead class="border-b border-sidebar-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground dark:border-sidebar-border">
                     <tr>
-                        <th class="px-4 py-2.5 font-medium">Symbol</th>
-                        <th class="px-4 py-2.5 font-medium">Name</th>
-                        <th class="px-4 py-2.5 text-right font-medium">Price</th>
-                        <th class="px-4 py-2.5 text-right font-medium">Change</th>
-                        <th class="px-4 py-2.5 text-right font-medium">Watch</th>
+                        <th class="px-4 py-2.5 font-medium">{{ t('stocks.symbol') }}</th>
+                        <th class="px-4 py-2.5 font-medium">{{ t('stocks.name') }}</th>
+                        <th class="px-4 py-2.5 text-right font-medium">{{ t('stocks.price') }}</th>
+                        <th class="px-4 py-2.5 text-right font-medium">{{ t('stocks.change') }}</th>
+                        <th class="px-4 py-2.5 text-right font-medium">{{ t('stocks.watch') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
@@ -96,7 +98,7 @@ const tabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIST' }, 
                                 v-if="stock.in_watchlist"
                                 :href="`/stocks/${stock.symbol}`"
                                 class="inline-flex items-center gap-1 text-amber-500"
-                                title="In watchlist"
+                                :title="t('stocks.inWatchlist')"
                             >
                                 <Star class="size-4 fill-current" />
                             </Link>
@@ -106,12 +108,12 @@ const tabs = [{ value: 'ALL', label: 'All' }, { value: 'BIST', label: 'BIST' }, 
                                 class="inline-flex items-center gap-1 rounded-md border border-sidebar-border/70 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground dark:border-sidebar-border"
                                 @click="addToWatchlist(stock)"
                             >
-                                <Plus class="size-3" /> Add
+                                <Plus class="size-3" /> {{ t('stocks.add') }}
                             </button>
                         </td>
                     </tr>
                     <tr v-if="stocks.length === 0">
-                        <td colspan="5" class="px-4 py-10 text-center text-muted-foreground">No stocks match your search.</td>
+                        <td colspan="5" class="px-4 py-10 text-center text-muted-foreground">{{ t('stocks.noMatches') }}</td>
                     </tr>
                 </tbody>
             </table>
