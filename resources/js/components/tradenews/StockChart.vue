@@ -11,9 +11,12 @@ import {
     type UTCTimestamp,
 } from 'lightweight-charts';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { Skeleton } from '@/components/ui/skeleton';
 import { candles as stockCandles } from '@/routes/stocks';
 import type { Candle } from '@/types';
+
+const { t } = useI18n();
 
 const props = defineProps<{
     symbol: string;
@@ -181,7 +184,7 @@ onBeforeUnmount(() => {
             v-else-if="empty"
             class="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground"
         >
-            No price history available yet.
+            {{ t('stocks.noPriceHistory') }}
         </div>
     </div>
 </template>

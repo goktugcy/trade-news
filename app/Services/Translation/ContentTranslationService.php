@@ -154,8 +154,9 @@ class ContentTranslationService
     public const STATUS_ORIGINAL = 'original';
 
     /**
-     * The per-user translation state of a news card: already translated, being
-     * translated (queued/in-flight), or shown in its original language.
+     * The per-user translation state of a news card. Translation is now
+     * on-demand, so this is only "translated" (a translation exists) or
+     * "original"; the transient "translating" state lives client-side.
      */
     public function newsTranslationStatus(NewsItem $item, ?string $locale): string
     {
@@ -163,17 +164,30 @@ class ContentTranslationService
             return self::STATUS_ORIGINAL;
         }
 
-        if ($item->translationFor($locale) !== null) {
-            return self::STATUS_TRANSLATED;
-        }
+        return $item->translationFor($locale) !== null
+            ? self::STATUS_TRANSLATED
+            : self::STATUS_ORIGINAL;
+    }
 
-        $model = $this->translationModel();
+    /**
+     * Whether a "Translate" button should be offered for this news item in the
+     * given locale (supported locale, configured model, different source
+     * language, not yet translated).
+     */
+    public function canTranslateNews(NewsItem $item, ?string $locale): bool
+    {
+        return is_string($locale) && $this->shouldTranslateNewsItem($item, $locale);
+    }
 
-        if (! $model instanceof AiModel || ! $this->shouldTranslateNewsItem($item, $locale, $model)) {
-            return self::STATUS_ORIGINAL;
-        }
-
-        return self::STATUS_TRANSLATING;
+    /**
+     * Whether a "Translate" button should be offered for a stock analysis.
+     */
+    public function canTranslateAnalysis(?StockAiAnalysis $analysis, ?string $locale): bool
+    {
+        return $analysis !== null
+            && is_string($locale)
+            && $analysis->translationFor($locale) === null
+            && $this->supports($locale);
     }
 
     private function shouldTranslateNewsItem(NewsItem $item, string $locale, ?AiModel $model = null): bool
@@ -223,7 +237,10 @@ class ContentTranslationService
 
     private function translationModel(): ?AiModel
     {
-        return $this->tasks->modelFor(AiTask::Translation);
+        // Translation is on-demand (explicit user action), so allow a configured
+        // model even if a previous failure marked it "down" — the attempt will
+        // recover its health on success.
+        return $this->tasks->configuredModelFor(AiTask::Translation);
     }
 
     private function translatorFor(AiModel $model): TextTranslatorInterface

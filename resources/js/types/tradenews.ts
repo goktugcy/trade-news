@@ -15,6 +15,7 @@ export type NewsCardData = {
     has_translation: boolean;
     translation_locale: 'en' | 'tr' | null;
     translation_status: 'translated' | 'translating' | 'original';
+    can_translate: boolean;
     url: string | null;
     image_url: string | null;
     market: Market | null;

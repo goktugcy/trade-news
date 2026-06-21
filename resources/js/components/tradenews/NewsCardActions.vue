@@ -2,9 +2,12 @@
 import { router } from '@inertiajs/vue3';
 import { Bookmark, BookmarkCheck, ThumbsDown, ThumbsUp } from '@lucide/vue';
 import { reactive, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { NewsCardData } from '@/types';
 
 const props = defineProps<{ news: NewsCardData }>();
+
+const { t } = useI18n();
 
 // Local optimistic state — the template binds to this so clicks feel instant.
 // The request only persists; it does NOT reload the (heavy) feed or shared props.
@@ -65,7 +68,7 @@ function toggleSave() {
                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
             :aria-pressed="local.reaction === 1"
-            title="Like"
+            :title="t('news.like')"
             @click="react(1)"
         >
             <ThumbsUp class="size-3.5" />
@@ -79,7 +82,7 @@ function toggleSave() {
                 ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
             :aria-pressed="local.reaction === -1"
-            title="Dislike"
+            :title="t('news.dislike')"
             @click="react(-1)"
         >
             <ThumbsDown class="size-3.5" />
@@ -93,12 +96,12 @@ function toggleSave() {
                 ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
             :aria-pressed="local.is_saved"
-            :title="local.is_saved ? 'Saved' : 'Save'"
+            :title="local.is_saved ? t('news.saved') : t('news.save')"
             @click="toggleSave"
         >
             <BookmarkCheck v-if="local.is_saved" class="size-3.5" />
             <Bookmark v-else class="size-3.5" />
-            {{ local.is_saved ? 'Saved' : 'Save' }}
+            {{ local.is_saved ? t('news.saved') : t('news.save') }}
         </button>
     </div>
 </template>

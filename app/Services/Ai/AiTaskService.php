@@ -39,6 +39,26 @@ class AiTaskService
      */
     public function modelFor(AiTask $task): ?AiModel
     {
+        $model = $this->resolveModel($task);
+
+        return $model !== null && $model->isHealthy() ? $model : null;
+    }
+
+    /**
+     * Like modelFor() but only requires the model to be *configured* (active +
+     * provider active + key), ignoring the down/disabled health flag. For
+     * explicit user actions (on-demand translate) that should be allowed to
+     * attempt — and thereby recover — a model previously marked down.
+     */
+    public function configuredModelFor(AiTask $task): ?AiModel
+    {
+        $model = $this->resolveModel($task);
+
+        return $model !== null && $model->isConfigured() ? $model : null;
+    }
+
+    private function resolveModel(AiTask $task): ?AiModel
+    {
         if (! $this->isEnabled($task)) {
             return null;
         }
@@ -57,10 +77,6 @@ class AiTaskService
                 ->where('task', $task->value)
                 ->where('is_active', true)
                 ->first();
-        }
-
-        if ($model === null || ! $model->isHealthy()) {
-            return null;
         }
 
         return $model;

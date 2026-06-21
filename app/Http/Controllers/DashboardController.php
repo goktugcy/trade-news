@@ -10,7 +10,6 @@ use App\Models\NewsSource;
 use App\Models\Watchlist;
 use App\Services\Market\MarketSessionService;
 use App\Services\MarketData\MarketSummaryService;
-use App\Services\Translation\ContentTranslationService;
 use App\Support\Presenters\NewsPresenter;
 use App\Support\Presenters\StockPresenter;
 use Illuminate\Http\Request;
@@ -49,8 +48,6 @@ class DashboardController extends Controller
             )
             ->limit(12)
             ->get();
-
-        app(ContentTranslationService::class)->queueNewsTranslations($feed, $locale);
 
         $watchlist = $user->watchlist()
             ->with('stock.latestPrice')

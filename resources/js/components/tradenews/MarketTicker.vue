@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useLiveQuotes } from '@/composables/useLiveQuotes';
 import { formatPercent, formatPrice } from '@/lib/format';
 import type { TickerItem } from '@/types';
 
 const page = usePage();
+const { t } = useI18n();
 
 // App-wide live ticker: polls the shared ticker payload (no page reload).
 const { ticker } = useLiveQuotes(() => []);
@@ -22,7 +24,7 @@ const isUp = (item: TickerItem) => (item.change_percent ?? 0) >= 0;
     <div
         v-if="items.length"
         class="ticker group/ticker relative flex h-9 shrink-0 items-center overflow-hidden border-b border-sidebar-border/70 bg-card/60 backdrop-blur dark:border-sidebar-border"
-        aria-label="Top gainers and losers"
+        :aria-label="t('dashboard.ariaTopMovers')"
     >
         <div class="ticker-track flex shrink-0" :style="{ animationDuration: duration }">
             <!-- Two identical copies → seamless -50% loop -->

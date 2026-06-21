@@ -41,6 +41,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('news/{newsItem}/react', [NewsInteractionController::class, 'react'])->name('news.react');
     Route::post('news/{newsItem}/save', [NewsInteractionController::class, 'save'])->name('news.save');
     Route::delete('news/{newsItem}/save', [NewsInteractionController::class, 'unsave'])->name('news.unsave');
+    Route::post('news/{newsItem}/translate', [NewsInteractionController::class, 'translate'])->name('news.translate');
 
     // Stocks (specific routes before the {stock} wildcard)
     Route::get('stocks', [StockController::class, 'index'])->name('stocks.index');
@@ -48,6 +49,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('stocks/live', [StockController::class, 'liveQuotes'])->name('stocks.live');
     Route::get('stocks/{stock}', [StockController::class, 'show'])->name('stocks.show');
     Route::get('stocks/{stock}/candles', [StockController::class, 'candles'])->name('stocks.candles');
+    Route::post('stocks/{stock}/analysis/translate', [StockController::class, 'translateAnalysis'])->name('stocks.analysis.translate');
 
     // Watchlist management
     Route::get('watchlist', [WatchlistController::class, 'index'])->name('watchlist.index');

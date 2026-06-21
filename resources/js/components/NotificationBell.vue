@@ -8,11 +8,13 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useI18n } from 'vue-i18n';
 import { useNotificationsPoll } from '@/composables/useNotificationsPoll';
 import { useUserTimezone } from '@/composables/useUserTimezone';
 
 const { count, items, refresh } = useNotificationsPoll();
 const { relative } = useUserTimezone();
+const { t } = useI18n();
 
 function markAllRead() {
     router.post('/notifications/read-all', {}, { preserveScroll: true, onSuccess: () => refresh() });
@@ -35,7 +37,7 @@ function open(id: number, actionUrl: string | null) {
     <DropdownMenu>
         <DropdownMenuTrigger
             class="relative inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label="Notifications"
+            :aria-label="t('notifications.title')"
         >
             <Bell class="size-5" />
             <span
@@ -46,20 +48,20 @@ function open(id: number, actionUrl: string | null) {
 
         <DropdownMenuContent class="w-80" align="end">
             <div class="flex items-center justify-between px-2 py-1.5">
-                <DropdownMenuLabel class="p-0">Notifications</DropdownMenuLabel>
+                <DropdownMenuLabel class="p-0">{{ t('notifications.title') }}</DropdownMenuLabel>
                 <button
                     v-if="count > 0"
                     type="button"
                     class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                     @click="markAllRead"
                 >
-                    <CheckCheck class="size-3.5" /> Mark all read
+                    <CheckCheck class="size-3.5" /> {{ t('notifications.markAllRead') }}
                 </button>
             </div>
             <DropdownMenuSeparator />
 
             <div v-if="items.length === 0" class="px-3 py-6 text-center text-sm text-muted-foreground">
-                You're all caught up.
+                {{ t('notifications.allCaughtUp') }}
             </div>
 
             <ul v-else class="max-h-80 overflow-y-auto">
@@ -85,7 +87,7 @@ function open(id: number, actionUrl: string | null) {
                 href="/notifications"
                 class="block px-3 py-2 text-center text-sm font-medium text-foreground hover:bg-accent"
             >
-                View all notifications
+                {{ t('notifications.viewAll') }}
             </Link>
         </DropdownMenuContent>
     </DropdownMenu>

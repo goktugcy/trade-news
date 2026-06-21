@@ -8,7 +8,6 @@ use App\Enums\Market;
 use App\Enums\Sentiment;
 use App\Models\NewsItem;
 use App\Models\NewsSource;
-use App\Services\Translation\ContentTranslationService;
 use App\Support\Presenters\NewsPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -102,10 +101,6 @@ class NewsController extends Controller
             ? $stockFilter($this->scopedQuery($request, $scope))->whereIn('id', $ids)->get()
             : collect();
 
-        // Only queue translations for brand-new items; already-visible items were
-        // queued when first served (avoids re-dispatching every poll tick).
-        app(ContentTranslationService::class)->queueNewsTranslations($newItems, $locale);
-
         return response()->json([
             'items' => NewsPresenter::collection($newItems, $locale),
             'updates' => NewsPresenter::collection($updates, $locale),
@@ -186,8 +181,6 @@ class NewsController extends Controller
         $paginator = $query->paginate(15)->withQueryString();
         $items = collect($paginator->items());
         $locale = $request->user()->locale;
-
-        app(ContentTranslationService::class)->queueNewsTranslations($items, $locale);
 
         return [
             'data' => NewsPresenter::collection($items, $locale),

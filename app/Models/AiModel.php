@@ -94,17 +94,27 @@ class AiModel extends Model
     }
 
     /**
-     * A model is usable when it (and its provider) are active, the provider has
-     * an API key, and the model has not been marked down/disabled by health checks.
+     * Configured = the model and its provider are active and a key is set.
+     * This ignores the health/down flag, so an explicit user action (on-demand
+     * translate) can still attempt — and recover — a model marked down.
      */
-    public function isHealthy(): bool
+    public function isConfigured(): bool
     {
         $provider = $this->provider;
 
         return $this->is_active
             && $provider !== null
             && $provider->is_active
-            && $provider->hasApiKey()
+            && $provider->hasApiKey();
+    }
+
+    /**
+     * Healthy = configured AND not marked down/disabled by health checks. Used
+     * by the automatic pipelines that should not hammer a failing model.
+     */
+    public function isHealthy(): bool
+    {
+        return $this->isConfigured()
             && ! in_array($this->status, [ProviderStatus::Down, ProviderStatus::Disabled], true);
     }
 

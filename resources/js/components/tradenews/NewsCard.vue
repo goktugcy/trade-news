@@ -1,16 +1,77 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { ExternalLink, Flame, Languages, Loader2 } from '@lucide/vue';
+import { reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import NewsCardActions from '@/components/tradenews/NewsCardActions.vue';
 import SentimentBadge from '@/components/tradenews/SentimentBadge.vue';
+import TypewriterText from '@/components/tradenews/TypewriterText.vue';
 import { useUserTimezone } from '@/composables/useUserTimezone';
+import { postJson } from '@/lib/http';
 import type { NewsCardData } from '@/types';
 
-defineProps<{ news: NewsCardData }>();
+const props = defineProps<{ news: NewsCardData }>();
 
 const { relative, dateTime } = useUserTimezone();
 const { t } = useI18n();
+
+// Local translation state so an on-demand translate updates the card in place,
+// while still resyncing when the live feed pushes a fresh version of this card.
+const local = reactive({
+    title: props.news.title,
+    summary: props.news.summary,
+    translation_status: props.news.translation_status,
+    can_translate: props.news.can_translate,
+});
+
+watch(
+    () => props.news,
+    (n) => {
+        local.title = n.title;
+        local.summary = n.summary;
+        local.translation_status = n.translation_status;
+        local.can_translate = n.can_translate;
+    },
+);
+
+const translating = ref(false);
+// Bumped when a fresh translation arrives so the text types in word-by-word.
+const revealKey = ref(0);
+
+type TranslateResponse = {
+    ok: boolean;
+    title: string;
+    summary: string | null;
+    translation_status: 'translated' | 'original';
+    can_translate: boolean;
+};
+
+async function translate(): Promise<void> {
+    if (translating.value) {
+        return;
+    }
+
+    translating.value = true;
+    local.translation_status = 'translating';
+
+    try {
+        const res = await postJson<TranslateResponse>(`/news/${props.news.id}/translate`);
+
+        if (res.ok) {
+            local.title = res.title;
+            local.summary = res.summary;
+            local.translation_status = res.translation_status;
+            local.can_translate = res.can_translate;
+            revealKey.value += 1;
+        } else {
+            local.translation_status = 'original';
+        }
+    } catch {
+        local.translation_status = 'original';
+    } finally {
+        translating.value = false;
+    }
+}
 </script>
 
 <template>
@@ -24,7 +85,7 @@ const { t } = useI18n();
             >
                 <img
                     :src="news.image_url"
-                    :alt="news.title"
+                    :alt="local.title"
                     class="size-full object-cover transition-transform group-hover:scale-[1.02]"
                     loading="lazy"
                     referrerpolicy="no-referrer"
@@ -60,13 +121,13 @@ const { t } = useI18n();
                         <Flame class="size-3" /> {{ t('news.highImpact') }}
                     </span>
                     <span
-                        v-if="news.translation_status === 'translating'"
+                        v-if="local.translation_status === 'translating'"
                         class="inline-flex items-center gap-1 rounded-md bg-sky-100 px-1.5 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
                     >
                         <Loader2 class="size-3 animate-spin" /> {{ t('common.translating') }}
                     </span>
                     <span
-                        v-else-if="news.translation_status === 'translated'"
+                        v-else-if="local.translation_status === 'translated'"
                         class="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
                     >
                         <Languages class="size-3" /> {{ t('common.translated') }}
@@ -81,17 +142,17 @@ const { t } = useI18n();
                         rel="noopener noreferrer"
                         class="hover:underline"
                     >
-                        {{ news.title }}
+                        <TypewriterText :text="local.title" :trigger="revealKey" />
                     </a>
-                    <span v-else>{{ news.title }}</span>
+                    <TypewriterText v-else :text="local.title" :trigger="revealKey" />
                 </h3>
 
-                <p v-if="news.summary" class="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
+                <p v-if="local.summary" class="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
                     <span
                         v-if="news.has_ai_summary"
                         class="mr-1 rounded bg-violet-100 px-1 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"
                     >AI</span>
-                    {{ news.summary }}
+                    <TypewriterText :text="local.summary" :trigger="revealKey" />
                 </p>
 
                 <div class="mt-3 flex flex-wrap items-center gap-1.5">
@@ -115,8 +176,17 @@ const { t } = useI18n();
                     </a>
                 </div>
 
-                <div class="mt-3 flex items-center justify-between border-t border-sidebar-border/60 pt-2.5 dark:border-sidebar-border">
+                <div class="mt-3 flex items-center justify-between gap-2 border-t border-sidebar-border/60 pt-2.5 dark:border-sidebar-border">
                     <NewsCardActions :news="news" />
+
+                    <button
+                        v-if="local.can_translate && local.translation_status !== 'translating'"
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-100 dark:text-sky-300 dark:hover:bg-sky-500/15"
+                        @click="translate"
+                    >
+                        <Languages class="size-3.5" /> {{ t('news.translateTo') }}
+                    </button>
                 </div>
             </div>
         </div>

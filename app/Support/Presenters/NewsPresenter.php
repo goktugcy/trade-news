@@ -19,7 +19,9 @@ class NewsPresenter
     {
         $translation = is_string($locale) ? $item->translationFor($locale) : null;
         $summary = $translation?->summary ?: ($item->ai_summary ?: $item->summary);
-        $translationStatus = app(ContentTranslationService::class)->newsTranslationStatus($item, $locale);
+        $translations = app(ContentTranslationService::class);
+        $translationStatus = $translations->newsTranslationStatus($item, $locale);
+        $canTranslate = $translations->canTranslateNews($item, $locale);
 
         return [
             'id' => $item->id,
@@ -29,6 +31,7 @@ class NewsPresenter
             'has_translation' => $translation !== null,
             'translation_locale' => $translation?->locale,
             'translation_status' => $translationStatus,
+            'can_translate' => $canTranslate,
             'url' => $item->url,
             'image_url' => $item->image_url,
             'market' => $item->market?->value,

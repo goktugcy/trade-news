@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Inbox } from '@lucide/vue';
 import type { Component } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 withDefaults(
     defineProps<{
@@ -9,10 +10,12 @@ withDefaults(
         icon?: Component;
     }>(),
     {
-        title: 'Nothing here yet',
+        title: '',
         description: '',
     },
 );
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -23,7 +26,7 @@ withDefaults(
             <component :is="icon ?? Inbox" class="size-6" />
         </div>
         <div class="space-y-1">
-            <p class="text-sm font-medium text-foreground">{{ title }}</p>
+            <p class="text-sm font-medium text-foreground">{{ title || t('common.emptyDefault') }}</p>
             <p v-if="description" class="mx-auto max-w-sm text-sm text-muted-foreground">{{ description }}</p>
         </div>
         <slot />

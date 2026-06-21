@@ -15,7 +15,7 @@ class AiChatTranslator implements TextTranslatorInterface
 
     public function isConfigured(AiModel $model): bool
     {
-        if (! $model->isHealthy()) {
+        if (! $model->isConfigured()) {
             return false;
         }
 
@@ -121,6 +121,7 @@ Always output the translated text in {$language} — never echo the source langu
 Preserve stock tickers, company names, numbers, dates, URLs, and financial units unless a natural localized form is clearly required.
 Return only valid JSON in this exact shape: {"translations":["translated text 1","translated text 2"]}.
 The translations array must have exactly the same length and order as the input texts array. Do not include markdown or any reasoning.
+/no_think
 PROMPT;
     }
 
@@ -167,6 +168,10 @@ PROMPT;
      */
     private function decodeJson(string $text): ?array
     {
+        // Strip reasoning-model <think>…</think> blocks (Qwen3 etc.), including a
+        // dangling unmatched opener if the response was truncated.
+        $text = (string) preg_replace('/<think>.*?<\/think>/is', '', $text);
+        $text = (string) preg_replace('/<think>.*$/is', '', $text);
         $text = trim($text);
 
         if (preg_match('/```(?:json)?\s*(.*?)```/is', $text, $match) === 1) {

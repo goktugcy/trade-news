@@ -109,8 +109,6 @@ class StockController extends Controller
             ->limit(20)
             ->get();
 
-        app(ContentTranslationService::class)->queueNewsTranslations($relatedNews, $locale);
-
         return Inertia::render('stocks/Show', [
             'stock' => StockPresenter::row($stock->load('latestPrice'), [
                 'in_watchlist' => $watchlistEntry !== null,
@@ -145,8 +143,6 @@ class StockController extends Controller
             return null;
         }
 
-        app(ContentTranslationService::class)->queueStockAnalysisTranslation($analysis, $locale);
-
         $translation = $analysis->translationFor($locale);
 
         return [
@@ -164,10 +160,37 @@ class StockController extends Controller
             'risks' => $translation?->risks ?: ($analysis->risks ?? []),
             'disclaimer' => $translation?->disclaimer ?: ($analysis->disclaimer ?? StockAiAnalysis::DISCLAIMER),
             'translation_locale' => $translation?->locale,
+            'translation_status' => $translation !== null
+                ? ContentTranslationService::STATUS_TRANSLATED
+                : ContentTranslationService::STATUS_ORIGINAL,
+            'can_translate' => app(ContentTranslationService::class)->canTranslateAnalysis($analysis, $locale),
             'generated_at' => $analysis->generated_at?->diffForHumans(),
             'is_stale' => $analysis->isStale() || ! $aiEnabled,
             'ai_enabled' => $aiEnabled,
         ];
+    }
+
+    /**
+     * On-demand: translate the stock's latest AI analysis to the user's locale
+     * synchronously and return the refreshed analysis payload (no page reload).
+     */
+    public function translateAnalysis(Request $request, Stock $stock): JsonResponse
+    {
+        $locale = $request->user()->locale;
+        $analysis = $stock->latestAiAnalysis()->first();
+
+        if ($analysis === null) {
+            return response()->json(['ok' => false], 404);
+        }
+
+        app(ContentTranslationService::class)->translateStockAnalysis($analysis, $locale);
+
+        $payload = $this->analysisPayload($stock, $locale);
+
+        return response()->json([
+            'ok' => $payload !== null && ($payload['translation_locale'] ?? null) !== null,
+            'analysis' => $payload,
+        ]);
     }
 
     /**
