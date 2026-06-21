@@ -10,6 +10,7 @@ use App\Models\Stock;
 use App\Services\Ai\AiTaskService;
 use App\Services\Ai\EmbeddingService;
 use App\Services\Ai\HuggingFaceEndpointClient;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -19,6 +20,10 @@ use Illuminate\Support\Facades\Log;
  */
 class NewsEntityEnhancer
 {
+    private const float MIN_ENTITY_SCORE = 0.82;
+
+    private const float MIN_SIMILARITY_SCORE = 0.55;
+
     public function __construct(
         private readonly AiTaskService $tasks,
         private readonly EmbeddingService $embeddings,
@@ -78,16 +83,14 @@ class NewsEntityEnhancer
 
         $words = collect($entities)
             ->filter(fn (array $e): bool => str_contains(mb_strtolower((string) ($e['entity_group'] ?? '')), 'org'))
+            ->filter(fn (array $e): bool => (float) ($e['score'] ?? 0.0) >= self::MIN_ENTITY_SCORE)
             ->map(fn (array $e): string => trim((string) ($e['word'] ?? '')))
             ->filter(fn (string $w): bool => mb_strlen($w) >= 3)
             ->unique()
             ->values();
 
         foreach ($words as $word) {
-            $stock = Stock::query()->active()
-                ->whereNotIn('id', $existing)
-                ->where(fn ($q) => $q->where('name', 'ILIKE', "%{$word}%")->orWhere('symbol', 'ILIKE', $word))
-                ->first();
+            $stock = $this->bestStockForEntity($word, $existing);
 
             if ($stock === null) {
                 continue;
@@ -95,7 +98,7 @@ class NewsEntityEnhancer
 
             $item->matches()->updateOrCreate(
                 ['stock_id' => $stock->id],
-                ['match_type' => 'keyword', 'matched_term' => $word, 'confidence' => 0.7, 'created_at' => now()],
+                ['match_type' => 'keyword', 'matched_term' => $word, 'confidence' => 0.78, 'created_at' => now()],
             );
 
             // Warm the embedding cache for the linked entity (entity linking aid).
@@ -108,6 +111,117 @@ class NewsEntityEnhancer
         }
 
         return $added;
+    }
+
+    /**
+     * @param  array<int, int>  $existing
+     */
+    private function bestStockForEntity(string $word, array $existing): ?Stock
+    {
+        $candidates = $this->candidateStocksForEntity($word, $existing);
+
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        if ($candidates->count() === 1) {
+            return $candidates->first();
+        }
+
+        $scores = $this->embeddings->similarity(
+            'query: '.$word,
+            $candidates
+                ->map(fn (Stock $stock): string => 'passage: '.$this->stockDescription($stock))
+                ->values()
+                ->all(),
+        );
+
+        if ($scores === null) {
+            return $candidates->first();
+        }
+
+        $bestIndex = 0;
+        $bestScore = 0.0;
+
+        foreach ($scores as $index => $score) {
+            if ($score > $bestScore) {
+                $bestIndex = $index;
+                $bestScore = $score;
+            }
+        }
+
+        if ($bestScore < self::MIN_SIMILARITY_SCORE) {
+            return null;
+        }
+
+        return $candidates->values()->get($bestIndex);
+    }
+
+    /**
+     * @param  array<int, int>  $existing
+     * @return Collection<int, Stock>
+     */
+    private function candidateStocksForEntity(string $word, array $existing): Collection
+    {
+        $needle = $this->normalize($word);
+
+        if ($needle === '') {
+            return collect();
+        }
+
+        return Stock::query()
+            ->active()
+            ->whereNotIn('id', $existing)
+            ->get()
+            ->filter(function (Stock $stock) use ($needle): bool {
+                foreach ($stock->matchTerms() as $term) {
+                    $term = $this->normalize($term);
+
+                    if ($term === '') {
+                        continue;
+                    }
+
+                    if ($this->entityMatchesTerm($needle, $term)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+            ->values();
+    }
+
+    private function entityMatchesTerm(string $needle, string $term): bool
+    {
+        if ($term === '' || mb_strlen(str_replace(' ', '', $term)) <= 2) {
+            return false;
+        }
+
+        if ($term === $needle) {
+            return true;
+        }
+
+        $needle = ' '.$needle.' ';
+        $term = ' '.$term.' ';
+
+        return str_contains($needle, $term) || str_contains($term, $needle);
+    }
+
+    private function stockDescription(Stock $stock): string
+    {
+        return trim(implode(' ', array_filter([
+            $stock->symbol,
+            $stock->name,
+            ...($stock->aliases ?? []),
+        ])));
+    }
+
+    private function normalize(string $value): string
+    {
+        $value = mb_strtolower($value);
+        $value = (string) preg_replace('/[^\pL\pN]+/u', ' ', $value);
+
+        return trim((string) preg_replace('/\s+/u', ' ', $value));
     }
 
     private function taskForItem(NewsItem $item): AiTask

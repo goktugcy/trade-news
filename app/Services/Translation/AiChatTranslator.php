@@ -118,7 +118,12 @@ class AiChatTranslator implements TextTranslatorInterface
         return <<<PROMPT
 You are a financial translation engine. Translate every input text into {$language} ({$targetLocale}).
 Always output the translated text in {$language} — never echo the source language.
-Preserve stock tickers, company names, numbers, dates, URLs, and financial units unless a natural localized form is clearly required.
+Translate meaning, not word-by-word, but do not summarize, simplify, paraphrase loosely, omit, or add facts.
+Preserve stock tickers, exchange symbols, company names, numbers, dates, URLs, percentages, currencies, and financial units unless a natural localized form is clearly required.
+Keep financial nuance: guidance, expectations, revenue, earnings, margin, profit/loss, dividend, buyback, downgrade/upgrade, risk, and uncertainty must remain explicit.
+Keep the same level of specificity as the source. A headline should remain headline-length; an analysis paragraph should remain a complete analysis paragraph.
+Do not turn concrete financial statements into generic statements. Preserve cause/effect wording such as "because", "after", "amid", "despite", "as investors expect", and "according to".
+Use natural professional finance terminology for the target language. For Turkish, prefer terms like "gelir", "kâr", "bilanço", "beklenti", "marj", "temettü", "hisse", "yukarı/aşağı yönlü risk" where appropriate.
 Return only valid JSON in this exact shape: {"translations":["translated text 1","translated text 2"]}.
 The translations array must have exactly the same length and order as the input texts array. Do not include markdown or any reasoning.
 /no_think

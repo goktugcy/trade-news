@@ -6,8 +6,11 @@ namespace App\Services\Ai;
 
 use App\Models\AiModel;
 use App\Services\Ai\Concerns\MeasuresAiRequests;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 /**
  * Client for Hugging Face dedicated (Inference Endpoints) deployments.
@@ -62,7 +65,7 @@ class HuggingFaceEndpointClient implements AiProviderClientInterface
             $text = trim((string) $response->json('choices.0.message.content'));
 
             return new AiCompletionResult($text !== '', $text !== '' ? $text : null, $latency, $text === '' ? 'Empty AI response.' : null);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return new AiCompletionResult(false, latencyMs: $this->latencyMs($startedAt), error: mb_substr($e->getMessage(), 0, 500));
         }
     }
@@ -117,14 +120,41 @@ class HuggingFaceEndpointClient implements AiProviderClientInterface
      */
     public function featureExtract(AiModel $model, string $input): AiCompletionResult
     {
-        return $this->pipeline($model, ['inputs' => $input], function (array $data): array {
+        $result = $this->pipeline($model, ['inputs' => $input], function (array $data): array {
             return ['embedding' => $this->flattenEmbedding($data)];
+        });
+
+        if (! $result->successful && $this->isSentenceSimilarityPayloadError($result->error)) {
+            return $this->sentenceSimilarity($model, $input, [$input]);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Sentence similarity endpoints (common for smaller E5/SentenceTransformers
+     * deployments) score one source sentence against candidate sentences.
+     *
+     * @param  array<int, string>  $sentences
+     */
+    public function sentenceSimilarity(AiModel $model, string $sourceSentence, array $sentences): AiCompletionResult
+    {
+        return $this->pipeline($model, [
+            'inputs' => [
+                'source_sentence' => $sourceSentence,
+                'sentences' => array_values($sentences),
+            ],
+        ], function (array $data): array {
+            return ['scores' => $this->similarityScores($data)];
         });
     }
 
     /**
-     * Reranking (hf_ranking). Hugging Face pipeline endpoints expect an inputs
-     * envelope; most rerankers return [{index, score}].
+     * Reranking (hf_ranking). Cross-encoder rerankers (e.g. BAAI/bge-reranker)
+     * are served by the HF Inference API as a text-classification pipeline that
+     * scores sentence pairs, so we send {query, document} pairs under "inputs"
+     * and read each pair's relevance score. (A dedicated TEI /rerank endpoint
+     * that prefers {query, texts} would 400 here; pairs work on both.)
      *
      * @param  array<int, string>  $documents
      */
@@ -140,32 +170,64 @@ class HuggingFaceEndpointClient implements AiProviderClientInterface
         $startedAt = $this->startedAt();
 
         try {
-            $response = $this->request($model)->post((string) $endpoint, [
-                'inputs' => [
-                    'query' => $query,
-                    'texts' => array_values($documents),
-                ],
-            ]);
+            $pairs = array_map(
+                fn (string $document): array => ['text' => $query, 'text_pair' => $document],
+                array_values($documents),
+            );
+
+            $response = $this->request($model)->post((string) $endpoint, ['inputs' => $pairs]);
 
             $latency = $this->latencyMs($startedAt);
 
             if ($response->failed()) {
-                return new AiCompletionResult(false, latencyMs: $latency, error: $this->errorMessage($response->status(), $response->json('error')));
+                return new AiCompletionResult(false, latencyMs: $latency, error: $this->errorMessage($response->status(), $response->json('error.message') ?? $response->json('error')));
             }
 
-            $rows = $response->json() ?? [];
-            $scores = [];
+            $rows = $response->json();
 
-            foreach ((is_array($rows) ? $rows : []) as $row) {
-                if (is_array($row) && isset($row['index'])) {
-                    $scores[] = ['label' => (string) $row['index'], 'score' => (float) ($row['score'] ?? 0.0)];
+            if (! is_array($rows)) {
+                return new AiCompletionResult(false, latencyMs: $latency, error: 'Empty AI response.');
+            }
+
+            $scores = [];
+            foreach (array_values($rows) as $index => $row) {
+                $scores[] = ['label' => (string) $index, 'score' => $this->relevanceScore($row)];
+            }
+
+            usort($scores, fn (array $a, array $b): int => $b['score'] <=> $a['score']);
+
+            return new AiCompletionResult(true, latencyMs: $latency, json: $rows, scores: $scores);
+        } catch (Throwable $e) {
+            return new AiCompletionResult(false, latencyMs: $this->latencyMs($startedAt), error: mb_substr($e->getMessage(), 0, 500));
+        }
+    }
+
+    /**
+     * Extract a relevance score from one text-classification result, which may be
+     * a single {label, score}, a list of label/score dicts, or a bare number.
+     */
+    private function relevanceScore(mixed $row): float
+    {
+        if (is_numeric($row)) {
+            return (float) $row;
+        }
+
+        if (is_array($row) && isset($row['score'])) {
+            return (float) $row['score'];
+        }
+
+        if (is_array($row)) {
+            $best = 0.0;
+            foreach ($row as $entry) {
+                if (is_array($entry) && isset($entry['score'])) {
+                    $best = max($best, (float) $entry['score']);
                 }
             }
 
-            return new AiCompletionResult(true, latencyMs: $latency, json: is_array($rows) ? $rows : null, scores: $scores);
-        } catch (\Throwable $e) {
-            return new AiCompletionResult(false, latencyMs: $this->latencyMs($startedAt), error: mb_substr($e->getMessage(), 0, 500));
+            return $best;
         }
+
+        return 0.0;
     }
 
     /**
@@ -209,7 +271,7 @@ class HuggingFaceEndpointClient implements AiProviderClientInterface
                 entities: $parsed['entities'] ?? null,
                 embedding: $parsed['embedding'] ?? null,
             );
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return new AiCompletionResult(false, latencyMs: $this->latencyMs($startedAt), error: mb_substr($e->getMessage(), 0, 500));
         }
     }
@@ -221,7 +283,18 @@ class HuggingFaceEndpointClient implements AiProviderClientInterface
             ->withToken(trim((string) $model->provider->api_key))
             ->connectTimeout(5)
             ->timeout(30)
-            ->retry(2, 500, throw: false);
+            ->retry(2, 500, function (Throwable $exception): bool {
+                if ($exception instanceof ConnectionException) {
+                    return true;
+                }
+
+                if (! $exception instanceof RequestException) {
+                    return false;
+                }
+
+                return $exception->response->status() === 429
+                    || $exception->response->serverError();
+            }, throw: false);
     }
 
     private function chatCompletionsUrl(string $endpoint): string
@@ -257,6 +330,48 @@ class HuggingFaceEndpointClient implements AiProviderClientInterface
         $message = is_string($message) && $message !== '' ? ": {$message}" : '';
 
         return "HTTP {$status}{$message}";
+    }
+
+    private function isSentenceSimilarityPayloadError(?string $error): bool
+    {
+        if ($error === null) {
+            return false;
+        }
+
+        return str_contains($error, 'SentenceSimilarityPipeline')
+            || str_contains($error, 'missing 1 required positional argument: \'sentences\'')
+            || str_contains($error, 'source_sentence');
+    }
+
+    /**
+     * @param  array<mixed>  $data
+     * @return array<int, array{label: string, score: float}>
+     */
+    private function similarityScores(array $data): array
+    {
+        if (isset($data['scores']) && is_array($data['scores'])) {
+            $data = $data['scores'];
+        }
+
+        if (isset($data[0]) && is_array($data[0]) && array_key_exists('score', $data[0])) {
+            return collect($data)
+                ->filter(fn (mixed $row): bool => is_array($row))
+                ->map(fn (array $row, int $index): array => [
+                    'label' => (string) ($row['index'] ?? $row['label'] ?? $index),
+                    'score' => (float) ($row['score'] ?? 0.0),
+                ])
+                ->values()
+                ->all();
+        }
+
+        return collect($data)
+            ->filter(fn (mixed $score): bool => is_numeric($score))
+            ->map(fn (mixed $score, int $index): array => [
+                'label' => (string) $index,
+                'score' => (float) $score,
+            ])
+            ->values()
+            ->all();
     }
 
     /**

@@ -283,7 +283,12 @@ class SyncMarketStocksCommand extends Command
 
     private function providerHasApiKey(ApiProvider $provider): bool
     {
-        return trim((string) $provider->api_key) !== '';
+        if (trim((string) $provider->api_key) !== '') {
+            return true;
+        }
+
+        return $provider->key === NasdaqSyncService::PROVIDER_KEY
+            && trim((string) config('tradenews.sync.fmp.key')) !== '';
     }
 
     /**

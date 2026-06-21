@@ -86,6 +86,39 @@ it('generates and stores a parsed AI stock analysis', function () {
         ->and($analysis->ai_model_id)->toBe($model->id)
         ->and($analysis->disclaimer)->toBe(StockAiAnalysis::DISCLAIMER)
         ->and($analysis->generated_at)->not->toBeNull();
+
+    Http::assertSent(fn ($request): bool => $request->data()['max_tokens'] === 700
+        && str_contains((string) data_get($request->data(), 'messages.0.content'), 'exactly 2 complete neutral sentences')
+        && str_contains((string) data_get($request->data(), 'messages.0.content'), 'Do not use ellipses'));
+});
+
+it('does not store a stock analysis when the generated summary is incomplete', function () {
+    $model = enableStockAnalysis();
+    $stock = Stock::factory()->create(['symbol' => 'AAPL', 'currency' => 'USD']);
+
+    $json = json_encode([
+        'signal' => 'neutral',
+        'confidence' => 51,
+        'horizon' => '1-3 months',
+        'estimated_price_low' => 180,
+        'estimated_price_high' => 195,
+        'estimated_price' => 188,
+        'summary' => 'Momentum is improving as recent headlines support sentiment and',
+        'drivers' => ['Recent sentiment improved'],
+        'risks' => ['Valuation remains stretched'],
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'analysis.hf.cloud/v1/chat/completions' => Http::response([
+            'choices' => [['message' => ['content' => (string) $json]]],
+        ], 200),
+    ]);
+
+    (new GenerateStockAnalysisJob([$stock->id]))->handle(app(StockAnalyzer::class));
+
+    expect(StockAiAnalysis::query()->where('stock_id', $stock->id)->count())->toBe(0)
+        ->and($model->fresh()->last_error)->toBe('Incomplete AI stock analysis summary.');
 });
 
 it('does not generate analysis when the task is disabled', function () {

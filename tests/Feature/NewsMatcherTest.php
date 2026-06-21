@@ -68,6 +68,67 @@ it('does not match unrelated news', function () {
         ->and($news->stocks()->count())->toBe(0);
 });
 
+it('does not match company aliases inside unrelated longer words', function () {
+    Stock::factory()->nasdaq()->create([
+        'symbol' => 'META',
+        'name' => 'Meta Platforms Inc.',
+        'aliases' => ['Meta'],
+    ]);
+
+    $news = makeNews('The metaverse trend is changing online gaming communities');
+
+    (new NewsMatcherService)->match($news);
+
+    expect($news->stocks()->pluck('symbol')->all())->not->toContain('META');
+});
+
+it('requires short aliases to appear as exact cased standalone tokens', function () {
+    $lowercaseNews = makeNews('thy customer experience report compares global airlines');
+    $uppercaseNews = makeNews('THY reports record passenger numbers');
+    $matcher = new NewsMatcherService;
+
+    $matcher->match($lowercaseNews);
+    $matcher->flushIndex();
+    $matcher->match($uppercaseNews);
+
+    expect($lowercaseNews->stocks()->pluck('symbol')->all())->not->toContain('THYAO')
+        ->and($uppercaseNews->stocks()->pluck('symbol')->all())->toContain('THYAO');
+});
+
+it('does not match ticker symbols inside English contractions or possessives', function (string $headline) {
+    Stock::factory()->nasdaq()->create([
+        'symbol' => 'HERE',
+        'name' => 'HERE Group Ltd',
+        'aliases' => ['HERE', 'HERE Group Ltd'],
+    ]);
+
+    $news = makeNews($headline);
+
+    (new NewsMatcherService)->match($news);
+
+    expect($news->stocks()->pluck('symbol')->all())->not->toContain('HERE');
+})->with([
+    'normal contraction' => ["Here's why markets are cautious before the Fed decision"],
+    'uppercase possessive' => ["HERE's what investors should watch before earnings"],
+]);
+
+it('still matches uppercase standalone ticker symbols', function (string $headline) {
+    Stock::factory()->nasdaq()->create([
+        'symbol' => 'HERE',
+        'name' => 'HERE Group Ltd',
+        'aliases' => ['HERE', 'HERE Group Ltd'],
+    ]);
+
+    $news = makeNews($headline);
+
+    (new NewsMatcherService)->match($news);
+
+    expect($news->stocks()->pluck('symbol')->all())->toContain('HERE');
+})->with([
+    'plain ticker' => ['HERE reports stronger revenue guidance'],
+    'cashtag ticker' => ['$HERE reports stronger revenue guidance'],
+]);
+
 it('records the match type and is idempotent', function () {
     $news = makeNews('ASELS shares climb on strong export orders');
     $matcher = new NewsMatcherService;

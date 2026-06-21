@@ -326,7 +326,12 @@ class ApiProviderRegistry
 
     private function providerApiKey(ApiProvider $provider): ?string
     {
-        $apiKey = trim((string) $provider->api_key);
+        $apiKey = trim((string) ($provider->api_key ?: match ($provider->key) {
+            'finnhub' => config('tradenews.market_data.providers.finnhub.key'),
+            'finnhub-news' => config('tradenews.news.providers.finnhub.key'),
+            'twelvedata' => config('tradenews.market_data.providers.twelvedata.key'),
+            default => null,
+        }));
 
         return $apiKey === '' ? null : $apiKey;
     }

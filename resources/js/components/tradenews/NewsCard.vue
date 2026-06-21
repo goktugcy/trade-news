@@ -147,7 +147,7 @@ async function translate(): Promise<void> {
                     <TypewriterText v-else :text="local.title" :trigger="revealKey" />
                 </h3>
 
-                <p v-if="local.summary" class="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
+                <p v-if="local.summary" class="mt-1.5 line-clamp-4 text-sm text-muted-foreground sm:line-clamp-3" :title="local.summary">
                     <span
                         v-if="news.has_ai_summary"
                         class="mr-1 rounded bg-violet-100 px-1 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"

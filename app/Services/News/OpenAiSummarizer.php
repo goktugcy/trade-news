@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\News;
 
 use App\Models\NewsItem;
+use App\Support\AiTextQuality;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -47,12 +48,13 @@ class OpenAiSummarizer implements AiSummarizerInterface
                 ->post('/chat/completions', [
                     'model' => $this->model,
                     'temperature' => 0.3,
-                    'max_tokens' => 160,
+                    'max_tokens' => 220,
                     'messages' => [
                         [
                             'role' => 'system',
-                            'content' => 'You summarize financial news in 2-3 neutral, factual sentences. '
-                                .'No opinions, no advice, no hype. Plain text only.',
+                            'content' => 'You summarize financial news in exactly one short paragraph with 2 complete neutral, factual sentences. '
+                                .'Keep it 45-80 words total. No opinions, no advice, no hype. Do not use ellipses. '
+                                .'Do not end with a conjunction. Plain text only.',
                         ],
                         ['role' => 'user', 'content' => $source],
                     ],
@@ -64,9 +66,9 @@ class OpenAiSummarizer implements AiSummarizerInterface
                 return null;
             }
 
-            $summary = trim((string) $response->json('choices.0.message.content'));
+            $summary = AiTextQuality::completeParagraph($response->json('choices.0.message.content'), maxCharacters: 700);
 
-            return $summary !== '' ? $summary : null;
+            return $summary;
         } catch (\Throwable $e) {
             Log::warning('OpenAI summary error', ['news_item' => $item->id, 'error' => $e->getMessage()]);
 

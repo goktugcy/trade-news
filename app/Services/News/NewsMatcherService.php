@@ -33,6 +33,8 @@ class NewsMatcherService
         self::TYPE_KEYWORD => 0.6,
     ];
 
+    private const int SHORT_ALIAS_MAX_LENGTH = 3;
+
     /**
      * Cached term index: list of [stockId, type, term] tuples.
      *
@@ -47,11 +49,12 @@ class NewsMatcherService
      */
     public function match(NewsItem $item): int
     {
-        $haystack = mb_strtolower(trim(implode(' ', array_filter([
+        $text = trim(implode(' ', array_filter([
             $item->title,
             $item->summary,
             $item->content,
-        ]))));
+        ])));
+        $haystack = mb_strtolower($text);
 
         if ($haystack === '') {
             $item->forceFill(['is_matched' => true])->save();
@@ -65,7 +68,7 @@ class NewsMatcherService
         foreach ($this->termIndex() as [$stockId, $type, $term, $market]) {
             $needle = mb_strtolower($term);
 
-            if (! $this->contains($haystack, $needle, $type)) {
+            if (! $this->contains($text, $haystack, $term, $needle, $type)) {
                 continue;
             }
 
@@ -106,19 +109,39 @@ class NewsMatcherService
     }
 
     /**
-     * Symbols are matched on word boundaries; names/aliases/keywords on substring.
+     * Match every term as a standalone phrase. Short aliases are case-sensitive
+     * to avoid matching generic lowercase words such as "thy" or "as".
      */
-    private function contains(string $haystack, string $needle, string $type): bool
+    private function contains(string $text, string $haystack, string $term, string $needle, string $type): bool
     {
         if ($needle === '') {
             return false;
         }
 
         if ($type === self::TYPE_SYMBOL) {
-            return (bool) preg_match('/\b'.preg_quote($needle, '/').'\b/u', $haystack);
+            return $this->containsSymbol($text, $term);
         }
 
-        return mb_strpos($haystack, $needle) !== false;
+        if ($type !== self::TYPE_NAME && mb_strlen($needle) <= self::SHORT_ALIAS_MAX_LENGTH) {
+            return $this->containsPhrase($text, $term, ignoreCase: false);
+        }
+
+        return $this->containsPhrase($haystack, $needle, ignoreCase: true);
+    }
+
+    private function containsSymbol(string $text, string $symbol): bool
+    {
+        $pattern = '/(?<![\pL\pN])'.preg_quote($symbol, '/').'(?![\'’][sS])(?![\pL\pN])/u';
+
+        return preg_match($pattern, $text) === 1;
+    }
+
+    private function containsPhrase(string $haystack, string $needle, bool $ignoreCase): bool
+    {
+        $flags = $ignoreCase ? 'iu' : 'u';
+        $pattern = '/(?<![\pL\pN])'.preg_quote($needle, '/').'(?![\pL\pN])/'.$flags;
+
+        return preg_match($pattern, $haystack) === 1;
     }
 
     /**

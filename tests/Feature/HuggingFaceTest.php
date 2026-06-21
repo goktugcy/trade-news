@@ -14,6 +14,7 @@ use App\Models\NewsItem;
 use App\Models\NewsSource;
 use App\Models\User;
 use App\Services\Ai\AiProviderClientFactory;
+use App\Services\Ai\EmbeddingService;
 use App\Services\Ai\HuggingFaceEndpointClient;
 use App\Services\News\NewsSentimentService;
 use Database\Seeders\AiTaskSeeder;
@@ -179,12 +180,60 @@ it('sends a feature-extraction request and returns an embedding vector', functio
         && $r->data()['inputs'] === 'embed me');
 });
 
-it('sends a ranking request with inputs query + texts and returns scores', function () {
+it('falls back to sentence-similarity payload for E5 endpoints deployed as sentence similarity', function () {
     Http::preventStrayRequests();
     Http::fake([
+        'emb.hf.cloud' => Http::sequence()
+            ->push(['error' => "SentenceSimilarityPipeline.__call__() missing 1 required positional argument: 'sentences'"], 400)
+            ->push([1.0], 200),
+    ]);
+
+    $model = hfModel(hfProvider(), AiTask::Embedding, AiRuntime::HfFeatureExtraction, 'https://emb.hf.cloud');
+    $result = app(AiProviderClientFactory::class)->huggingFace()->featureExtract($model, 'connection test');
+
+    expect($result->successful)->toBeTrue()
+        ->and($result->embedding)->toBeNull()
+        ->and($result->scores[0]['score'])->toBe(1.0);
+
+    Http::assertSent(fn (Request $r): bool => $r->url() === 'https://emb.hf.cloud'
+        && data_get($r->data(), 'inputs.source_sentence') === 'connection test'
+        && data_get($r->data(), 'inputs.sentences') === ['connection test']);
+});
+
+it('uses sentence-similarity scores for embedding task entity linking', function () {
+    Http::preventStrayRequests();
+    Http::fake([
+        'emb.hf.cloud' => Http::response([0.93, 0.12], 200),
+    ]);
+
+    $model = hfModel(hfProvider(), AiTask::Embedding, AiRuntime::HfFeatureExtraction, 'https://emb.hf.cloud');
+
+    AiSetting::query()->create(['enabled' => true]);
+    AiTaskSetting::query()->create([
+        'task' => AiTask::Embedding->value,
+        'enabled' => true,
+        'active_ai_model_id' => $model->id,
+    ]);
+
+    $scores = app(EmbeddingService::class)->similarity('query: Apple', [
+        'passage: AAPL Apple Inc.',
+        'passage: MSFT Microsoft Corporation',
+    ]);
+
+    expect($scores)->toBe([0.93, 0.12]);
+
+    Http::assertSent(fn (Request $r): bool => $r->url() === 'https://emb.hf.cloud'
+        && data_get($r->data(), 'inputs.source_sentence') === 'query: Apple'
+        && data_get($r->data(), 'inputs.sentences.0') === 'passage: AAPL Apple Inc.');
+});
+
+it('sends a cross-encoder reranking request as sentence pairs and ranks by score', function () {
+    Http::preventStrayRequests();
+    Http::fake([
+        // text-classification cross-encoder: one relevance score per pair.
         'rank.hf.cloud' => Http::response([
-            ['index' => 1, 'score' => 0.8],
-            ['index' => 0, 'score' => 0.2],
+            ['label' => 'LABEL_1', 'score' => 0.2],
+            ['label' => 'LABEL_1', 'score' => 0.9],
         ], 200),
     ]);
 
@@ -192,11 +241,14 @@ it('sends a ranking request with inputs query + texts and returns scores', funct
     $result = app(AiProviderClientFactory::class)->huggingFace()->rank($model, 'query', ['doc a', 'doc b']);
 
     expect($result->successful)->toBeTrue()
+        // doc b (index 1) has the higher score, so it ranks first.
         ->and($result->scores[0]['label'])->toBe('1');
 
     Http::assertSent(fn (Request $r): bool => $r->url() === 'https://rank.hf.cloud'
-        && $r->data()['inputs']['query'] === 'query'
-        && $r->data()['inputs']['texts'] === ['doc a', 'doc b']);
+        && $r->data()['inputs'] === [
+            ['text' => 'query', 'text_pair' => 'doc a'],
+            ['text' => 'query', 'text_pair' => 'doc b'],
+        ]);
 });
 
 it('encrypts the Hugging Face token and never exposes it in props', function () {

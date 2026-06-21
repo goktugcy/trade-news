@@ -8,6 +8,7 @@ use App\Enums\AiTask;
 use App\Enums\StockSignal;
 use App\Models\Stock;
 use App\Models\StockAiAnalysis;
+use App\Support\AiTextQuality;
 use App\Support\Presenters\StockPresenter;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -53,6 +54,14 @@ class StockAnalyzer
             return null;
         }
 
+        $summary = AiTextQuality::completeParagraph(isset($parsed['summary']) ? (string) $parsed['summary'] : null, maxCharacters: 900);
+
+        if ($summary === null) {
+            $this->tasks->recordFailure($model, 'Incomplete AI stock analysis summary.', $result->latencyMs);
+
+            return null;
+        }
+
         $this->tasks->recordSuccess($model, $result->latencyMs);
 
         return StockAiAnalysis::query()->create([
@@ -65,7 +74,7 @@ class StockAnalyzer
             'estimated_price_high' => $this->floatOrNull($parsed['estimated_price_high'] ?? null),
             'estimated_price' => $this->floatOrNull($parsed['estimated_price'] ?? null),
             'currency' => $stock->currency,
-            'summary' => isset($parsed['summary']) ? (string) $parsed['summary'] : null,
+            'summary' => $summary,
             'drivers' => $this->stringList($parsed['drivers'] ?? null),
             'risks' => $this->stringList($parsed['risks'] ?? null),
             'disclaimer' => StockAiAnalysis::DISCLAIMER,
@@ -85,10 +94,10 @@ class StockAnalyzer
         $headlines = $stock->news()
             ->where('is_matched', true)
             ->orderByDesc('published_at')
-            ->limit(8)
+            ->limit(6)
             ->get(['news_items.id', 'title', 'sentiment', 'published_at'])
             ->map(fn ($n): array => [
-                'title' => $n->title,
+                'title' => Str::limit((string) $n->title, 180, ''),
                 'sentiment' => $n->sentiment?->value,
                 'published_at' => $n->published_at?->toDateString(),
             ])
@@ -112,15 +121,15 @@ class StockAnalyzer
      */
     private function prompt(array $snapshot): string
     {
-        return (string) json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        return (string) json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 
     private function instructions(): string
     {
         return <<<'PROMPT'
-        You are a financial analysis assistant. Given a JSON snapshot of a stock
+        You are a financial analysis assistant. Given a compact JSON snapshot of a stock
         (price, recent change, sector, and recent news headlines with sentiment),
-        respond with ONLY a JSON object (no markdown, no prose) with these keys:
+        respond with ONLY a compact JSON object (no markdown, no prose) with these keys:
         {
           "signal": "bullish" | "neutral" | "bearish",
           "confidence": 0-100 integer,
@@ -128,10 +137,11 @@ class StockAnalyzer
           "estimated_price_low": number,
           "estimated_price_high": number,
           "estimated_price": number,
-          "summary": "2-3 sentence neutral rationale",
-          "drivers": ["short bullet", ...],
-          "risks": ["short bullet", ...]
+          "summary": "one paragraph, exactly 2 complete neutral sentences, 45-80 words total",
+          "drivers": ["short concrete factor, 6-14 words", "short concrete factor, 6-14 words"],
+          "risks": ["short concrete risk, 6-14 words", "short concrete risk, 6-14 words"]
         }
+        Complete every sentence. Do not use ellipses. Do not end any text with "and", "or", "because", "with", or another dangling connector.
         Base prices on the provided current price. Do not give investment advice.
         PROMPT;
     }
@@ -169,10 +179,12 @@ class StockAnalyzer
             return null;
         }
 
-        $items = array_values(array_filter(array_map(
-            fn ($v): string => is_scalar($v) ? trim((string) $v) : '',
-            $value,
-        ), fn (string $v): bool => $v !== ''));
+        $items = collect($value)
+            ->map(fn (mixed $v): ?string => is_scalar($v) ? AiTextQuality::completeListItem((string) $v) : null)
+            ->filter()
+            ->take(2)
+            ->values()
+            ->all();
 
         return $items === [] ? null : $items;
     }

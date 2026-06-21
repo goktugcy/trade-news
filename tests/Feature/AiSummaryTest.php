@@ -25,7 +25,9 @@ it('stores an OpenAI summary on the news item', function () {
     expect($item->fresh()->ai_summary)->toBe('Apple posted record quarterly revenue, beating estimates.')
         ->and($item->fresh()->ai_summary_generated_at)->not->toBeNull();
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/chat/completions'));
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/chat/completions')
+        && $request->data()['max_tokens'] === 220
+        && str_contains((string) data_get($request->data(), 'messages.0.content'), '2 complete neutral, factual sentences'));
 });
 
 it('no-ops when AI summarization is disabled', function () {
@@ -46,4 +48,21 @@ it('returns null and does not throw when the OpenAI API fails', function () {
     );
 
     expect($summary)->toBeNull();
+});
+
+it('rejects incomplete OpenAI summaries instead of storing half sentences', function () {
+    Http::fake([
+        'api.openai.com/*' => Http::response([
+            'choices' => [['message' => ['content' => 'Apple revenue beat expectations and']]],
+        ], 200),
+    ]);
+
+    app()->instance(AiSummarizerInterface::class, new OpenAiSummarizer('test-key', 'gpt-4o-mini'));
+
+    $item = NewsItem::factory()->create(['ai_summary' => null, 'content' => 'Apple earnings report full text.']);
+
+    (new GenerateNewsSummaryJob([$item->id]))->handle(app(AiSummarizerInterface::class));
+
+    expect($item->fresh()->ai_summary)->toBeNull()
+        ->and($item->fresh()->ai_summary_generated_at)->toBeNull();
 });

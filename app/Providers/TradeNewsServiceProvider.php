@@ -71,7 +71,7 @@ class TradeNewsServiceProvider extends ServiceProvider
                 ->first();
 
             return new FmpClient(
-                $provider?->api_key,
+                $provider?->api_key ?: config('tradenews.sync.fmp.key'),
                 $provider?->base_url ?: (string) config('tradenews.sync.fmp.base_url', 'https://financialmodelingprep.com/stable'),
                 (string) config('tradenews.sync.fmp.exchange', 'NASDAQ'),
             );

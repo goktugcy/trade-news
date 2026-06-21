@@ -23,6 +23,7 @@ class NasdaqSyncService
 
     public function __construct(
         private readonly FmpClient $fmp,
+        private readonly UsIndexUniverseService $universe,
         private readonly ProviderHealthService $health,
         private readonly NotificationCenter $notifications,
     ) {}
@@ -32,18 +33,27 @@ class NasdaqSyncService
         $run = $this->startRun('nasdaq_list');
 
         try {
-            $rows = $this->fmp->stockList();
+            $universe = $this->universe->resolve();
+            $allowedSymbols = array_flip($universe['symbols']);
+            $rows = $this->fmp->stockList(filterExchange: false);
             $existing = Stock::query()->where('market', Market::NASDAQ->value)
                 ->pluck('symbol')->map(fn (string $s) => mb_strtoupper($s))->flip();
 
             $created = 0;
             $updated = 0;
             $processed = 0;
+            $skippedByUniverse = 0;
 
             foreach ($rows as $row) {
-                $symbol = mb_strtoupper(trim((string) ($row['symbol'] ?? '')));
+                $symbol = UsIndexUniverseService::normalizeSymbol((string) ($row['symbol'] ?? ''));
 
                 if ($symbol === '') {
+                    continue;
+                }
+
+                if (! isset($allowedSymbols[$symbol])) {
+                    $skippedByUniverse++;
+
                     continue;
                 }
 
@@ -58,7 +68,13 @@ class NasdaqSyncService
                 $processed++;
             }
 
-            return $this->finish($run, $processed, $created, $updated);
+            return $this->finish($run, $processed, $created, $updated, [
+                'universe_source' => $universe['source'],
+                'universe_symbol_count' => count($universe['symbols']),
+                'sp500_count' => $universe['sp500_count'],
+                'nasdaq100_count' => $universe['nasdaq100_count'],
+                'skipped_by_universe' => $skippedByUniverse,
+            ]);
         } catch (Throwable $e) {
             if ($this->isUnavailableFmpListEndpoint($e)) {
                 return $this->skipRun($run, 'fmp_list_endpoint_unavailable', $e);
@@ -130,7 +146,10 @@ class NasdaqSyncService
         ]);
     }
 
-    private function finish(SyncRun $run, int $processed, int $created, int $updated): SyncRun
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function finish(SyncRun $run, int $processed, int $created, int $updated, array $meta = []): SyncRun
     {
         $previous = $this->previousRun($run);
 
@@ -140,6 +159,7 @@ class NasdaqSyncService
             'created_count' => $created,
             'updated_count' => $updated,
             'finished_at' => now(),
+            'meta' => $meta,
         ]);
 
         $this->health->recordSuccess(self::PROVIDER_KEY, 'sync:'.$run->type);

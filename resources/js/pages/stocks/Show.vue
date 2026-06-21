@@ -256,7 +256,7 @@ function toggleAlert() {
             </div>
 
             <template v-if="analysisLocal">
-                <p v-if="analysisLocal.summary" class="text-sm text-foreground">
+                <p v-if="analysisLocal.summary" class="text-sm leading-relaxed text-foreground">
                     <TypewriterText :text="analysisLocal.summary" :trigger="analysisRevealKey" />
                 </p>
 

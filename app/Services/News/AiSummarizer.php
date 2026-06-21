@@ -7,6 +7,7 @@ namespace App\Services\News;
 use App\Models\AiModel;
 use App\Models\NewsItem;
 use App\Services\Ai\AiProviderClientInterface;
+use App\Support\AiTextQuality;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -28,7 +29,7 @@ class AiSummarizer implements AiSummarizerInterface
         $result = $this->client->complete(
             $this->model,
             $source,
-            'You summarize financial news in 2-3 neutral, factual sentences. No opinions, no advice, no hype. Plain text only.',
+            'You summarize financial news in exactly one short paragraph with 2 complete neutral, factual sentences. Keep it 45-80 words total. No opinions, no advice, no hype. Do not use ellipses. Do not end with a conjunction. Plain text only.',
         );
 
         if (! $result->successful) {
@@ -42,9 +43,9 @@ class AiSummarizer implements AiSummarizerInterface
             return null;
         }
 
-        $summary = trim((string) $result->text);
+        $summary = AiTextQuality::completeParagraph($result->text, maxCharacters: 700);
 
-        return $summary !== '' ? $summary : null;
+        return $summary;
     }
 
     public function isEnabled(): bool

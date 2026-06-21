@@ -8,10 +8,10 @@ use App\Enums\Market;
 use App\Enums\ProviderType;
 use App\Models\ApiProvider;
 use App\Models\Stock;
+use App\Services\Sync\UsIndexUniverseService;
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 use JsonException;
 
 class SyncNasdaqStocksCommand extends Command
@@ -27,11 +27,11 @@ class SyncNasdaqStocksCommand extends Command
 
     protected $description = 'Sync NASDAQ stock symbols from Finnhub into the stocks catalog';
 
-    public function handle(): int
+    public function handle(UsIndexUniverseService $universe): int
     {
         $provider = $this->finnhubProvider();
         $baseUrl = $provider?->base_url ?: (string) config('tradenews.market_data.providers.finnhub.base_url');
-        $apiKey = trim((string) $provider?->api_key);
+        $apiKey = trim((string) ($provider?->api_key ?: config('tradenews.market_data.providers.finnhub.key')));
 
         if ($apiKey === '') {
             $this->error('Finnhub provider API key is not configured.');
@@ -69,6 +69,14 @@ class SyncNasdaqStocksCommand extends Command
         }
 
         $rows = $this->rows($payload);
+        $universeResult = $universe->resolve();
+        $allowedSymbols = array_flip($universeResult['symbols']);
+        $beforeUniverseFilter = count($rows);
+        $rows = array_values(array_filter(
+            $rows,
+            fn (array $row): bool => isset($allowedSymbols[(string) $row['symbol']]),
+        ));
+        $skippedByUniverse = $beforeUniverseFilter - count($rows);
 
         if ($this->limit() !== null) {
             $rows = array_slice($rows, 0, $this->limit());
@@ -90,6 +98,7 @@ class SyncNasdaqStocksCommand extends Command
         }
 
         $this->info('Synced '.count($rows).' NASDAQ stock symbol(s).');
+        $this->line('Universe source: '.$universeResult['source'].'; skipped '.$skippedByUniverse.' symbol(s) outside Nasdaq-100 + S&P 500.');
 
         return self::SUCCESS;
     }
@@ -123,10 +132,6 @@ class SyncNasdaqStocksCommand extends Command
                 continue;
             }
 
-            if (($row['mic'] ?? null) !== 'XNAS') {
-                continue;
-            }
-
             if (! $this->option('all-types') && ! in_array($row['type'] ?? null, $types, true)) {
                 continue;
             }
@@ -151,7 +156,7 @@ class SyncNasdaqStocksCommand extends Command
      */
     private function normalizeRow(array $row): ?array
     {
-        $symbol = Str::upper(trim((string) (($row['displaySymbol'] ?? null) ?: ($row['symbol'] ?? ''))));
+        $symbol = UsIndexUniverseService::normalizeSymbol((string) (($row['displaySymbol'] ?? null) ?: ($row['symbol'] ?? '')));
         $name = trim((string) ($row['description'] ?? ''));
 
         if ($symbol === '' || $name === '') {

@@ -174,6 +174,10 @@ it('uses the active Hugging Face translation task to cache translated stock anal
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://translate.endpoints.huggingface.cloud/v1/chat/completions'
         && $request->hasHeader('Authorization', 'Bearer hf-secret')
         && $request->data()['model'] === 'Qwen/Qwen3-8B'
+        && str_contains((string) data_get($request->data(), 'messages.0.content'), 'do not summarize')
+        && str_contains((string) data_get($request->data(), 'messages.0.content'), 'same level of specificity')
+        && str_contains((string) data_get($request->data(), 'messages.0.content'), 'Do not turn concrete financial statements into generic statements')
+        && str_contains((string) data_get($request->data(), 'messages.0.content'), 'professional finance terminology')
         && str_contains((string) data_get($request->data(), 'messages.1.content'), '"target_locale":"en"')
         && str_contains((string) data_get($request->data(), 'messages.1.content'), '"Özet"'));
 });

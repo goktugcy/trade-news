@@ -35,18 +35,19 @@ class FmpClient
      *
      * @return array<int, array<string, mixed>>
      */
-    public function stockList(): array
+    public function stockList(bool $filterExchange = true): array
     {
-        $rows = Http::baseUrl($this->baseUrl)
-            ->connectTimeout(5)
-            ->timeout(30)
-            ->retry(2, 500)
-            ->throw()
-            ->get('/stock-list', ['apikey' => $this->apiKey])
-            ->json();
+        $rows = $this->get('/stock-list', timeout: 30);
 
         if (! is_array($rows)) {
             return [];
+        }
+
+        if (! $filterExchange) {
+            return array_values(array_filter(
+                $rows,
+                fn (mixed $row): bool => is_array($row) && ($row['isActivelyTrading'] ?? true) !== false,
+            ));
         }
 
         return array_values(array_filter(
@@ -56,19 +57,37 @@ class FmpClient
     }
 
     /**
+     * Current S&P 500 constituents.
+     *
+     * @return array<int|string, mixed>
+     */
+    public function sp500Constituents(): array
+    {
+        $rows = $this->get('/sp500-constituent');
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * Current ETF holdings for a fund such as QQQ or SPY.
+     *
+     * @return array<int|string, mixed>
+     */
+    public function etfHoldings(string $symbol): array
+    {
+        $rows = $this->get('/etf/holdings', ['symbol' => mb_strtoupper(trim($symbol))]);
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
      * Company profile for a symbol, or null if FMP has none.
      *
      * @return array<string, mixed>|null
      */
     public function profile(string $symbol): ?array
     {
-        $rows = Http::baseUrl($this->baseUrl)
-            ->connectTimeout(5)
-            ->timeout(15)
-            ->retry(2, 400)
-            ->throw()
-            ->get('/profile', ['symbol' => $symbol, 'apikey' => $this->apiKey])
-            ->json();
+        $rows = $this->get('/profile', ['symbol' => $symbol], timeout: 15, retryDelay: 400);
 
         if (! is_array($rows)) {
             return null;
@@ -79,6 +98,20 @@ class FmpClient
         }
 
         return $this->isAssoc($rows) ? $rows : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $query
+     */
+    private function get(string $path, array $query = [], int $timeout = 20, int $retryDelay = 500): mixed
+    {
+        return Http::baseUrl($this->baseUrl)
+            ->connectTimeout(5)
+            ->timeout($timeout)
+            ->retry(2, $retryDelay)
+            ->throw()
+            ->get($path, array_merge($query, ['apikey' => $this->apiKey]))
+            ->json();
     }
 
     private function normalizeBaseUrl(string $baseUrl): string

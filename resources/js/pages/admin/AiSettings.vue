@@ -157,6 +157,18 @@ const bannerClasses: Record<string, string> = {
     slate: 'border-sidebar-border/70 bg-card text-foreground dark:border-sidebar-border',
 };
 
+const outputTokenDefaults: Record<string, number> = {
+    summary: 300,
+    stock_analysis: 700,
+    translation: 900,
+    sentiment_tr: 160,
+    sentiment_en: 160,
+    entity_tr: 160,
+    entity_en: 160,
+    embedding: 160,
+    reranker: 160,
+};
+
 const providerDialogOpen = ref(false);
 const modelDialogOpen = ref(false);
 const editingProviderId = ref<number | null>(null);
@@ -257,6 +269,15 @@ const modelTemperature = computed<string | number>({
         modelForm.temperature = value === '' ? null : Number(value);
     },
 });
+
+watch(
+    () => modelForm.task,
+    (task) => {
+        if (editingModelId.value === null) {
+            modelForm.max_output_tokens = task !== null ? (outputTokenDefaults[task] ?? 160) : 160;
+        }
+    },
+);
 
 const dotClass = (color: string): string => dotColors[color] ?? dotColors.slate;
 const bannerClass = (color: string): string => bannerClasses[color] ?? bannerClasses.slate;
@@ -539,73 +560,53 @@ function testConnection(model: AiModel) {
             <h2 class="text-sm font-semibold text-foreground">AI tasks</h2>
             <p class="mt-1 text-sm text-muted-foreground">Enable AI per task and pick the model it uses. Disabled tasks fall back to the deterministic pipeline.</p>
 
-            <div class="mt-3 overflow-x-auto">
-                <table class="w-full min-w-180 text-sm">
-                    <thead>
-                        <tr class="border-b border-sidebar-border/70 text-left text-xs tracking-wide text-muted-foreground uppercase dark:border-sidebar-border">
-                            <th class="px-2 py-2 font-medium">Task</th>
-                            <th class="px-2 py-2 font-medium">Enabled</th>
-                            <th class="px-2 py-2 font-medium">Model</th>
-                            <th class="px-2 py-2 font-medium">Status</th>
-                            <th class="px-2 py-2 font-medium">Fallback</th>
-                            <th class="px-2 py-2 text-right font-medium">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
-                        <tr v-for="row in taskRowsWithoutTranslation" :key="row.task">
-                            <td class="px-2 py-2">
-                                <div class="font-medium text-foreground">{{ row.label }}</div>
-                                <div v-if="row.last_error" class="mt-0.5 max-w-[16rem] truncate text-[11px] text-rose-600 dark:text-rose-400" :title="row.last_error">{{ row.last_error }}</div>
-                            </td>
-                            <td class="px-2 py-2">
-                                <input type="checkbox" class="size-4 rounded border-input accent-primary" v-model="row.enabled" @change="saveTask(row)" />
-                            </td>
-                            <td class="px-2 py-2">
-                                <select
-                                    v-model="row.active_ai_model_id"
-                                    class="border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-8 w-full min-w-48 rounded-md border px-2 text-sm shadow-xs outline-none dark:bg-input/30"
-                                    @change="saveTask(row)"
-                                >
-                                    <option :value="null">No model</option>
-                                    <option v-for="option in row.models" :key="option.value" :value="option.value">{{ option.label }}</option>
-                                </select>
-                            </td>
-                            <td class="px-2 py-2">
-                                <span v-if="row.status" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <span class="size-2 rounded-full" :class="dotClass(row.status_color ?? 'slate')" />
-                                    {{ row.status_label }}
-                                    <span v-if="row.last_latency_ms !== null">· {{ row.last_latency_ms }} ms</span>
-                                </span>
-                                <span v-else class="text-xs text-muted-foreground">—</span>
-                            </td>
-                            <td class="px-2 py-2">
-                                <Input
-                                    :model-value="row.fallback_behavior ?? ''"
-                                    class="h-8 w-32"
-                                    placeholder="default"
-                                    @update:model-value="(v) => setFallback(row, v)"
-                                    @blur="saveTask(row)"
-                                />
-                            </td>
-                            <td class="px-2 py-2">
-                                <div class="flex justify-end">
-                                    <Button type="button" size="sm" variant="outline" :disabled="row.active_ai_model_id === null" @click="testTaskConnection(row)">
-                                        <Play class="size-4" />
-                                        Test
-                                    </Button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div
+                    v-for="row in taskRowsWithoutTranslation"
+                    :key="row.task"
+                    class="flex flex-col gap-2.5 rounded-lg border border-sidebar-border/70 p-3 dark:border-sidebar-border"
+                >
+                    <div class="flex items-start justify-between gap-2">
+                        <span class="min-w-0 truncate text-sm font-medium text-foreground" :title="row.label">{{ row.label }}</span>
+                        <label class="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <input type="checkbox" class="size-4 rounded border-input accent-primary" v-model="row.enabled" @change="saveTask(row)" />
+                            Enabled
+                        </label>
+                    </div>
+
+                    <select
+                        v-model="row.active_ai_model_id"
+                        class="border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-2 text-sm shadow-xs outline-none dark:bg-input/30"
+                        @change="saveTask(row)"
+                    >
+                        <option :value="null">No model</option>
+                        <option v-for="option in row.models" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+
+                    <div class="flex items-center justify-between gap-2">
+                        <span v-if="row.status" class="inline-flex min-w-0 items-center gap-1.5 truncate text-xs text-muted-foreground">
+                            <span class="size-2 shrink-0 rounded-full" :class="dotClass(row.status_color ?? 'slate')" />
+                            {{ row.status_label }}
+                            <span v-if="row.last_latency_ms !== null">· {{ row.last_latency_ms }} ms</span>
+                        </span>
+                        <span v-else class="text-xs text-muted-foreground">—</span>
+
+                        <Button type="button" size="sm" variant="outline" class="shrink-0" :disabled="row.active_ai_model_id === null" @click="testTaskConnection(row)">
+                            <Play class="size-4" />
+                            Test
+                        </Button>
+                    </div>
+
+                    <p v-if="row.last_error" class="truncate text-[11px] text-rose-600 dark:text-rose-400" :title="row.last_error">{{ row.last_error }}</p>
+                </div>
             </div>
         </section>
 
-        <div class="grid gap-4 xl:grid-cols-2">
+        <div class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(100%,28rem),1fr))]">
             <section
                 v-for="provider in providers"
                 :key="provider.id"
-                class="rounded-lg border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border"
+                class="flex min-w-0 flex-col rounded-lg border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border"
             >
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="min-w-0">

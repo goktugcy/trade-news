@@ -15,15 +15,26 @@ use App\Services\Notification\NotificationCenter;
 use App\Services\Providers\ProviderHealthService;
 use App\Services\Sync\FmpClient;
 use App\Services\Sync\NasdaqSyncService;
+use App\Services\Sync\UsIndexUniverseService;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 
+beforeEach(function (): void {
+    Cache::flush();
+
+    config(['tradenews.sync.us_universe.source' => 'fallback']);
+});
+
 function fmpService(): NasdaqSyncService
 {
+    $fmp = new FmpClient('test-key', 'https://financialmodelingprep.com/api/v3', 'NASDAQ');
+
     return new NasdaqSyncService(
-        new FmpClient('test-key', 'https://financialmodelingprep.com/api/v3', 'NASDAQ'),
+        $fmp,
+        new UsIndexUniverseService($fmp),
         app(ProviderHealthService::class),
         app(NotificationCenter::class),
     );
@@ -287,6 +298,31 @@ it('runs FMP NASDAQ list sync from the generic market auto-sync command', functi
     expect(Stock::query()->where('market', Market::NASDAQ->value)->where('symbol', 'AAPL')->exists())->toBeTrue()
         ->and($provider->fresh()->meta['last_fetched_at_by_capability']['list'] ?? null)->not->toBeNull()
         ->and($job?->meta['provider_keys'] ?? null)->toBe(['fmp']);
+});
+
+it('uses the configured FMP key for generic market auto-sync when the provider row key is blank', function () {
+    config(['tradenews.sync.fmp.key' => 'config-fmp-key']);
+
+    seedFmpProvider([
+        'api_key' => null,
+        'auto_sync_stocks' => true,
+        'capabilities' => ['list'],
+        'refresh_interval_minutes' => 1,
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'financialmodelingprep.com/stable/stock-list*' => Http::response([
+            ['symbol' => 'AAPL', 'name' => 'Apple Inc.', 'exchangeShortName' => 'NASDAQ', 'isActivelyTrading' => true],
+        ], 200),
+    ]);
+
+    $this->artisan('tradenews:sync-market-stocks --force')->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => str_contains($request->url(), '/stable/stock-list')
+        && str_contains($request->url(), 'apikey=config-fmp-key'));
+
+    expect(Stock::query()->where('market', Market::NASDAQ->value)->where('symbol', 'AAPL')->exists())->toBeTrue();
 });
 
 it('syncs BIST100 stocks and quote prices through RapidAPI auto-sync', function () {

@@ -146,6 +146,14 @@ return [
             'rate_limit_per_minute' => (int) env('FMP_RATE_LIMIT_PER_MINUTE', 250),
             'profile_ttl_days' => (int) env('FMP_PROFILE_TTL_DAYS', 30),
         ],
+
+        'us_universe' => [
+            'source' => env('US_INDEX_UNIVERSE_SOURCE', 'auto'), // auto | fmp | fallback
+            'nasdaq100_etf' => env('US_INDEX_UNIVERSE_NASDAQ100_ETF', 'QQQ'),
+            'cache_ttl_seconds' => (int) env('US_INDEX_UNIVERSE_CACHE_TTL_SECONDS', 43200),
+            'min_sp500_symbols' => (int) env('US_INDEX_UNIVERSE_MIN_SP500_SYMBOLS', 400),
+            'min_nasdaq100_symbols' => (int) env('US_INDEX_UNIVERSE_MIN_NASDAQ100_SYMBOLS', 80),
+        ],
     ],
 
     /*
