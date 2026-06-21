@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { Bell, BellOff, Star } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import LivePrice from '@/components/tradenews/LivePrice.vue';
 import MarketBadge from '@/components/tradenews/MarketBadge.vue';
 import NewsFeed from '@/components/tradenews/NewsFeed.vue';
 import PriceChange from '@/components/tradenews/PriceChange.vue';
 import StockChart from '@/components/tradenews/StockChart.vue';
 import { Button } from '@/components/ui/button';
+import { useLiveQuotes } from '@/composables/useLiveQuotes';
 import { formatNumber, formatPrice } from '@/lib/format';
 import type { NewsCardData, SelectOption, StockRow } from '@/types';
 
@@ -42,6 +44,16 @@ const signalClasses: Record<string, string> = {
     rose: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
     slate: 'bg-muted text-muted-foreground',
 };
+
+// Live hero price (no reload). Falls back to the SSR values until the first poll.
+const { quotes } = useLiveQuotes(() => [props.stock.symbol]);
+const liveStock = computed<StockRow>(() => {
+    const quote = quotes.value[props.stock.symbol];
+
+    return quote
+        ? { ...props.stock, price: quote.price, change: quote.change, change_percent: quote.change_percent, quote_at: quote.quote_at }
+        : props.stock;
+});
 
 defineOptions({
     layout: {
@@ -113,10 +125,10 @@ function toggleAlert() {
             </div>
 
             <div class="flex flex-col items-start gap-2 sm:items-end">
-                <div class="flex items-baseline gap-2">
-                    <span class="text-3xl font-bold tabular-nums text-foreground">{{ formatPrice(stock.price, stock.currency) }}</span>
+                <div class="flex items-baseline gap-2 text-3xl font-bold text-foreground">
+                    <LivePrice :value="liveStock.price" :currency="liveStock.currency" />
                 </div>
-                <PriceChange :change="stock.change" :change-percent="stock.change_percent" />
+                <PriceChange :change="liveStock.change" :change-percent="liveStock.change_percent" />
 
                 <div class="mt-1 flex items-center gap-2">
                     <Button v-if="!stock.in_watchlist" size="sm" variant="outline" @click="addToWatchlist">
@@ -233,6 +245,8 @@ function toggleAlert() {
             <h2 class="text-sm font-semibold text-foreground">Related news</h2>
             <NewsFeed
                 :news="news"
+                scope="all"
+                :live-filters="{ stock: stock.symbol }"
                 empty-title="No related news yet"
                 empty-description="News mentioning this company will appear here once matched."
             />

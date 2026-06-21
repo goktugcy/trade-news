@@ -34,6 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // News feeds (static routes before the {newsItem} wildcard)
     Route::get('news', [NewsController::class, 'index'])->name('news.index');
+    Route::get('news/live', [NewsController::class, 'live'])->name('news.live');
     Route::get('news/watchlist', [NewsController::class, 'watchlist'])->name('news.watchlist');
     Route::get('news/saved', [NewsController::class, 'saved'])->name('news.saved');
     Route::patch('news/sources/{newsSource}', [NewsSourcePreferenceController::class, 'update'])->name('news.sources.update');
@@ -44,6 +45,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Stocks (specific routes before the {stock} wildcard)
     Route::get('stocks', [StockController::class, 'index'])->name('stocks.index');
     Route::get('stocks/search', [StockController::class, 'search'])->name('stocks.search');
+    Route::get('stocks/live', [StockController::class, 'liveQuotes'])->name('stocks.live');
     Route::get('stocks/{stock}', [StockController::class, 'show'])->name('stocks.show');
     Route::get('stocks/{stock}/candles', [StockController::class, 'candles'])->name('stocks.candles');
 

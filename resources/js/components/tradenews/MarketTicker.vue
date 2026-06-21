@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { useLiveQuotes } from '@/composables/useLiveQuotes';
 import { formatPercent, formatPrice } from '@/lib/format';
 import type { TickerItem } from '@/types';
 
 const page = usePage();
 
-const items = computed<TickerItem[]>(() => (page.props.ticker as TickerItem[] | undefined) ?? []);
+// App-wide live ticker: polls the shared ticker payload (no page reload).
+const { ticker } = useLiveQuotes(() => []);
+
+const items = computed<TickerItem[]>(() => ticker.value ?? (page.props.ticker as TickerItem[] | undefined) ?? []);
 
 // Keep the scroll speed roughly constant regardless of how many items there are.
 const duration = computed(() => `${Math.max(24, items.value.length * 3)}s`);

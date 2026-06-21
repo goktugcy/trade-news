@@ -12,6 +12,9 @@ export default {
         read: 'Oku',
         page: 'Sayfa {current} / {last}',
         noSources: 'Kaynak tanımlı değil.',
+        translating: 'Çeviriliyor…',
+        translated: 'Türkçe çeviri',
+        live: 'Canlı',
     },
     nav: {
         platform: 'Platform',
@@ -80,6 +83,7 @@ export default {
         noNewsDescription: 'Zamanlanmış haber toplayıcıları çalışınca haberler burada görünür.',
         highImpact: 'Yüksek etki',
         moreSources: '+{count} kaynak',
+        newItems: '{count} yeni haber',
         noSaved: 'Henüz kayıtlı haber yok',
         noSavedDescription: 'Sonra okumak için herhangi bir haberde yer işaretine dokun.',
         browseNews: 'Haberlere göz at',

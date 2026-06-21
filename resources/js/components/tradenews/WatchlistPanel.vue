@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import LivePrice from '@/components/tradenews/LivePrice.vue';
 import MarketBadge from '@/components/tradenews/MarketBadge.vue';
 import PriceChange from '@/components/tradenews/PriceChange.vue';
-import { formatPrice } from '@/lib/format';
 import type { StockRow } from '@/types';
 
 defineProps<{ items: StockRow[]; title?: string }>();
@@ -34,8 +34,8 @@ defineProps<{ items: StockRow[]; title?: string }>();
                         <p class="truncate text-xs text-muted-foreground">{{ stock.name }}</p>
                     </div>
                     <div class="text-right">
-                        <p class="text-sm font-medium tabular-nums text-foreground">
-                            {{ formatPrice(stock.price, stock.currency) }}
+                        <p class="text-sm font-medium text-foreground">
+                            <LivePrice :value="stock.price" :currency="stock.currency" />
                         </p>
                         <PriceChange
                             class="text-xs"

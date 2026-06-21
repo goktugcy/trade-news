@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Presenters;
 
 use App\Models\NewsItem;
+use App\Services\Translation\ContentTranslationService;
 
 /**
  * Shapes news items into the array contract consumed by the Vue feed.
@@ -18,6 +19,7 @@ class NewsPresenter
     {
         $translation = is_string($locale) ? $item->translationFor($locale) : null;
         $summary = $translation?->summary ?: ($item->ai_summary ?: $item->summary);
+        $translationStatus = app(ContentTranslationService::class)->newsTranslationStatus($item, $locale);
 
         return [
             'id' => $item->id,
@@ -26,6 +28,7 @@ class NewsPresenter
             'has_ai_summary' => $item->ai_summary !== null,
             'has_translation' => $translation !== null,
             'translation_locale' => $translation?->locale,
+            'translation_status' => $translationStatus,
             'url' => $item->url,
             'image_url' => $item->image_url,
             'market' => $item->market?->value,

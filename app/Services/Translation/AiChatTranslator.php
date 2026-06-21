@@ -71,7 +71,7 @@ class AiChatTranslator implements TextTranslatorInterface
         $result = $client->complete(
             $model,
             $this->translationPayload($indexedTexts, $targetLocale, $sourceLocale),
-            $this->instructions(),
+            $this->instructions($targetLocale),
         );
 
         if (! $result->successful || $result->text === null) {
@@ -111,14 +111,26 @@ class AiChatTranslator implements TextTranslatorInterface
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 
-    private function instructions(): string
+    private function instructions(string $targetLocale): string
     {
-        return <<<'PROMPT'
-You are a financial translation engine. Translate every input text into the requested target locale.
+        $language = $this->languageName($targetLocale);
+
+        return <<<PROMPT
+You are a financial translation engine. Translate every input text into {$language} ({$targetLocale}).
+Always output the translated text in {$language} — never echo the source language.
 Preserve stock tickers, company names, numbers, dates, URLs, and financial units unless a natural localized form is clearly required.
 Return only valid JSON in this exact shape: {"translations":["translated text 1","translated text 2"]}.
-The translations array must have exactly the same length and order as the input texts array. Do not include markdown.
+The translations array must have exactly the same length and order as the input texts array. Do not include markdown or any reasoning.
 PROMPT;
+    }
+
+    private function languageName(string $locale): string
+    {
+        return match (strtolower($locale)) {
+            'tr', 'tr-tr' => 'Turkish',
+            'en', 'en-us', 'en-gb' => 'English',
+            default => $locale,
+        };
     }
 
     /**

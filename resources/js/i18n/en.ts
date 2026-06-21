@@ -12,6 +12,9 @@ export default {
         read: 'Read',
         page: 'Page {current} of {last}',
         noSources: 'No sources configured.',
+        translating: 'Translating…',
+        translated: 'Translated',
+        live: 'Live',
     },
     nav: {
         platform: 'Platform',
@@ -80,6 +83,7 @@ export default {
         noNewsDescription: 'News will appear here once the scheduled fetchers run.',
         highImpact: 'High impact',
         moreSources: '+{count} more',
+        newItems: '{count} new articles',
         noSaved: 'No saved articles yet',
         noSavedDescription: 'Tap the bookmark on any story to save it here for later.',
         browseNews: 'Browse news',

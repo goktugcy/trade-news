@@ -11,6 +11,7 @@ use App\Models\NewsSource;
 use App\Services\Translation\ContentTranslationService;
 use App\Support\Presenters\NewsPresenter;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -67,6 +68,69 @@ class NewsController extends Controller
             'options' => $this->filterOptions(),
             'scope' => 'saved',
         ]);
+    }
+
+    /**
+     * Polling endpoint: returns brand-new items (id > after) for the Twitter-style
+     * "+N new" pill, plus refreshed cards for already-visible ids (so translation /
+     * sentiment / counts swap in place without a page reload).
+     */
+    public function live(Request $request): JsonResponse
+    {
+        $scope = $request->string('scope')->toString();
+        $scope = in_array($scope, ['all', 'watchlist', 'saved'], true) ? $scope : 'all';
+        $after = $request->integer('after');
+        $locale = $request->user()->locale;
+
+        $ids = collect(explode(',', $request->string('ids')->toString()))
+            ->map(fn (string $id): int => (int) trim($id))
+            ->filter(fn (int $id): bool => $id > 0)
+            ->take(60)
+            ->values();
+
+        $stock = $request->string('stock')->upper()->toString();
+        $stockFilter = fn (Builder $q): Builder => $q->when(
+            $stock !== '',
+            fn (Builder $inner) => $inner->whereHas('stocks', fn (Builder $s) => $s->where('symbol', $stock)),
+        );
+
+        $newItems = $after > 0
+            ? $stockFilter($this->scopedQuery($request, $scope))->where('id', '>', $after)->limit(20)->get()
+            : collect();
+
+        $updates = $ids->isNotEmpty()
+            ? $stockFilter($this->scopedQuery($request, $scope))->whereIn('id', $ids)->get()
+            : collect();
+
+        // Only queue translations for brand-new items; already-visible items were
+        // queued when first served (avoids re-dispatching every poll tick).
+        app(ContentTranslationService::class)->queueNewsTranslations($newItems, $locale);
+
+        return response()->json([
+            'items' => NewsPresenter::collection($newItems, $locale),
+            'updates' => NewsPresenter::collection($updates, $locale),
+            'latest_id' => (int) ($newItems->max('id') ?? $after),
+        ]);
+    }
+
+    /**
+     * Base feed query narrowed to a scope (all | watchlist | saved).
+     *
+     * @return Builder<NewsItem>
+     */
+    private function scopedQuery(Request $request, string $scope): Builder
+    {
+        $query = $this->baseQuery($request);
+        $uid = $request->user()->id;
+
+        return match ($scope) {
+            'watchlist' => $query->whereHas(
+                'stocks',
+                fn (Builder $q) => $q->whereIn('stocks.id', $request->user()->watchlist()->pluck('stock_id')),
+            ),
+            'saved' => $query->whereHas('savedForUser', fn (Builder $q) => $q->where('user_id', $uid)),
+            default => $query,
+        };
     }
 
     /**

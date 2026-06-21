@@ -12,7 +12,9 @@ use App\Models\Stock;
 use App\Models\StockAiAnalysis;
 use App\Models\StockPrice;
 use App\Services\Ai\AiTaskService;
+use App\Services\Market\MarketSessionService;
 use App\Services\MarketData\MarketDataIngestor;
+use App\Services\MarketData\MarketSummaryService;
 use App\Services\Providers\ApiProviderRegistry;
 use App\Services\Translation\ContentTranslationService;
 use App\Support\Presenters\NewsPresenter;
@@ -166,6 +168,48 @@ class StockController extends Controller
             'is_stale' => $analysis->isStale() || ! $aiEnabled,
             'ai_enabled' => $aiEnabled,
         ];
+    }
+
+    /**
+     * Polling endpoint: live quotes for the given symbols (cached, cheap) plus
+     * the shared ticker / top-movers / market status so the dashboard and stock
+     * pages update without a reload.
+     */
+    public function liveQuotes(Request $request, MarketSummaryService $summary, MarketSessionService $sessions): JsonResponse
+    {
+        $symbols = collect(explode(',', $request->string('symbols')->upper()->toString()))
+            ->map(fn (string $symbol): string => trim($symbol))
+            ->filter(fn (string $symbol): bool => $symbol !== '')
+            ->unique()
+            ->take(60)
+            ->values();
+
+        $quotes = $symbols->isEmpty()
+            ? []
+            : Stock::query()
+                ->active()
+                ->whereIn('symbol', $symbols)
+                ->with('latestPrice')
+                ->get()
+                ->map(function (Stock $stock): array {
+                    $row = StockPresenter::row($stock);
+
+                    return [
+                        'symbol' => $row['symbol'],
+                        'price' => $row['price'],
+                        'change' => $row['change'],
+                        'change_percent' => $row['change_percent'],
+                        'quote_at' => $row['quote_at'],
+                    ];
+                })
+                ->all();
+
+        return response()->json([
+            'quotes' => $quotes,
+            'ticker' => $summary->cachedTicker(),
+            'top_movers' => $summary->cachedTopMovers(),
+            'market_status' => $sessions->all($request->user()->timezone),
+        ]);
     }
 
     /**

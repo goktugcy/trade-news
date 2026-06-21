@@ -147,6 +147,35 @@ class ContentTranslationService
         );
     }
 
+    public const STATUS_TRANSLATED = 'translated';
+
+    public const STATUS_TRANSLATING = 'translating';
+
+    public const STATUS_ORIGINAL = 'original';
+
+    /**
+     * The per-user translation state of a news card: already translated, being
+     * translated (queued/in-flight), or shown in its original language.
+     */
+    public function newsTranslationStatus(NewsItem $item, ?string $locale): string
+    {
+        if (! is_string($locale) || ! in_array($locale, ['en', 'tr'], true)) {
+            return self::STATUS_ORIGINAL;
+        }
+
+        if ($item->translationFor($locale) !== null) {
+            return self::STATUS_TRANSLATED;
+        }
+
+        $model = $this->translationModel();
+
+        if (! $model instanceof AiModel || ! $this->shouldTranslateNewsItem($item, $locale, $model)) {
+            return self::STATUS_ORIGINAL;
+        }
+
+        return self::STATUS_TRANSLATING;
+    }
+
     private function shouldTranslateNewsItem(NewsItem $item, string $locale, ?AiModel $model = null): bool
     {
         if (! $this->supports($locale, $model) || $item->translationFor($locale) !== null) {

@@ -8,9 +8,10 @@ import NewsFeed from '@/components/tradenews/NewsFeed.vue';
 import OnboardingWizard from '@/components/tradenews/OnboardingWizard.vue';
 import StatCard from '@/components/tradenews/StatCard.vue';
 import WatchlistPanel from '@/components/tradenews/WatchlistPanel.vue';
+import { useLiveQuotes } from '@/composables/useLiveQuotes';
 import type { MarketStatusInfo, NewsCardData, NewsSourcePref, SelectOption, StockRow } from '@/types';
 
-defineProps<{
+const props = defineProps<{
     feed: NewsCardData[];
     watchlist: StockRow[];
     topMovers: { gainers: StockRow[]; losers: StockRow[] };
@@ -27,6 +28,24 @@ defineOptions({
 const page = usePage();
 const { t } = useI18n();
 const shouldShowOnboarding = computed(() => page.props.onboarding?.should_show === true);
+
+// Live prices for the watchlist + movers/market status (no page reload).
+const { quotes, topMovers: liveTopMovers, marketStatus: liveMarketStatus } = useLiveQuotes(() =>
+    props.watchlist.map((stock) => stock.symbol),
+);
+
+const liveWatchlist = computed<StockRow[]>(() =>
+    props.watchlist.map((row) => {
+        const quote = quotes.value[row.symbol];
+
+        return quote
+            ? { ...row, price: quote.price, change: quote.change, change_percent: quote.change_percent, quote_at: quote.quote_at }
+            : row;
+    }),
+);
+
+const movers = computed(() => liveTopMovers.value ?? props.topMovers);
+const marketStatusLive = computed(() => liveMarketStatus.value ?? props.marketStatus);
 </script>
 
 <template>
@@ -55,6 +74,7 @@ const shouldShowOnboarding = computed(() => page.props.onboarding?.should_show =
                 </div>
                 <NewsFeed
                     :news="feed"
+                    scope="all"
                     :empty-title="t('dashboard.noMatchedNews')"
                     :empty-description="t('dashboard.noMatchedNewsDescription')"
                 />
@@ -62,8 +82,8 @@ const shouldShowOnboarding = computed(() => page.props.onboarding?.should_show =
 
             <!-- Right rail -->
             <aside class="flex flex-col gap-4">
-                <WatchlistPanel :items="watchlist" />
-                <MarketSummaryPanel :market-status="marketStatus" :movers="topMovers" />
+                <WatchlistPanel :items="liveWatchlist" />
+                <MarketSummaryPanel :market-status="marketStatusLive" :movers="movers" />
 
                 <section class="rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
                     <header class="flex items-center justify-between border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">

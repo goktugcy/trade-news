@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { ExternalLink, Flame } from '@lucide/vue';
+import { ExternalLink, Flame, Languages, Loader2 } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import NewsCardActions from '@/components/tradenews/NewsCardActions.vue';
 import SentimentBadge from '@/components/tradenews/SentimentBadge.vue';
@@ -58,6 +58,18 @@ const { t } = useI18n();
                         class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
                     >
                         <Flame class="size-3" /> {{ t('news.highImpact') }}
+                    </span>
+                    <span
+                        v-if="news.translation_status === 'translating'"
+                        class="inline-flex items-center gap-1 rounded-md bg-sky-100 px-1.5 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
+                    >
+                        <Loader2 class="size-3 animate-spin" /> {{ t('common.translating') }}
+                    </span>
+                    <span
+                        v-else-if="news.translation_status === 'translated'"
+                        class="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                    >
+                        <Languages class="size-3" /> {{ t('common.translated') }}
                     </span>
                 </div>
 

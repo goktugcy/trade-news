@@ -14,6 +14,7 @@ export type NewsCardData = {
     has_ai_summary: boolean;
     has_translation: boolean;
     translation_locale: 'en' | 'tr' | null;
+    translation_status: 'translated' | 'translating' | 'original';
     url: string | null;
     image_url: string | null;
     market: Market | null;
@@ -119,4 +120,27 @@ export type TickerItem = {
     price: number | null;
     currency: string;
     change_percent: number | null;
+};
+
+export type NewsFeedScope = 'all' | 'watchlist' | 'saved';
+
+export type LiveNewsResponse = {
+    items: NewsCardData[];
+    updates: NewsCardData[];
+    latest_id: number;
+};
+
+export type LiveQuote = {
+    symbol: string;
+    price: number | null;
+    change: number | null;
+    change_percent: number | null;
+    quote_at: string | null;
+};
+
+export type LiveQuotesResponse = {
+    quotes: LiveQuote[];
+    ticker: TickerItem[];
+    top_movers: { gainers: StockRow[]; losers: StockRow[] };
+    market_status: MarketStatusInfo[];
 };

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -l app/Http/Controllers/NewsController.php)",
+      "Bash(php -l app/Http/Controllers/StockController.php)"
+    ]
+  }
+}

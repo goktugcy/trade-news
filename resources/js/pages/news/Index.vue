@@ -28,6 +28,15 @@ defineOptions({
 const baseUrl = () => (props.scope === 'watchlist' ? '/news/watchlist' : '/news');
 const search = ref(props.filters.q ?? '');
 
+// Live feed only on the first page (newest); later pages stay static so the
+// "+N new" pill never prepends page-1 items onto an older page.
+const liveScope = computed(() => (props.news.meta.current_page === 1 ? props.scope : undefined));
+const liveFilters = computed(() => ({
+    market: props.filters.market === 'ALL' ? null : props.filters.market,
+    sentiment: props.filters.sentiment,
+    q: props.filters.q,
+}));
+
 function apply(overrides: Record<string, string | null>) {
     const query: Record<string, string> = {};
     const market = overrides.market ?? props.filters.market;
@@ -129,7 +138,7 @@ const marketTabs = computed(() => [
         </EmptyState>
 
         <template v-else>
-            <NewsFeed :news="news.data" />
+            <NewsFeed :news="news.data" :scope="liveScope" :live-filters="liveFilters" />
 
             <!-- Pagination -->
             <div v-if="news.meta.last_page > 1" class="flex items-center justify-between pt-2">
