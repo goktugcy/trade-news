@@ -46,6 +46,9 @@ class DashboardController extends Controller
                 $preferredMarkets !== [],
                 fn ($q) => $q->whereIn('market', $preferredMarkets),
             )
+            // Order by id (ingestion order), matching the live poll's cursor so
+            // already-seen items aren't re-offered as "new" after a refresh.
+            ->reorder('id', 'desc')
             ->limit(12)
             ->get();
 

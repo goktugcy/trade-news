@@ -82,7 +82,9 @@ class StockController extends Controller
                 $disabledSourceIds->isNotEmpty(),
                 fn (Builder $q) => $q->whereNotIn('source_id', $disabledSourceIds),
             )
-            ->orderByDesc('published_at')
+            // Order by id (ingestion order), matching the live poll's cursor so
+            // already-seen related news isn't re-offered as "new" after a refresh.
+            ->orderByDesc('id')
             ->limit(20)
             ->get();
 
