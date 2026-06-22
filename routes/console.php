@@ -66,9 +66,10 @@ Schedule::command('tradenews:evaluate-alerts')
     ->withoutOverlapping()
     ->onOneServer();
 
-// Provider health probe.
+// Provider health probe (every 5 minutes so degraded/down/recovered transitions
+// and daily usage counters surface promptly in the admin monitoring view).
 Schedule::command('tradenews:check-providers')
-    ->everyThirtyMinutes()
+    ->everyFiveMinutes()
     ->onOneServer();
 
 // Market stock universe sync: checked every minute; provider settings decide when each capability is due.

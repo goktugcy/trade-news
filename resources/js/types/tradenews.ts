@@ -47,6 +47,7 @@ export type StockRow = {
     name: string;
     market: Market;
     exchange: string | null;
+    tradingview_symbol?: string | null;
     currency: string;
     sector: string | null;
     industry?: string | null;

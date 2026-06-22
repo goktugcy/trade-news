@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\Market;
+use App\Enums\StockIndex;
 use App\Services\Providers\ApiProviderRegistry;
 use Database\Factories\StockFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $name
  * @property Market $market
  * @property string|null $exchange
+ * @property string|null $tradingview_symbol
  * @property string $currency
  * @property array<int, string>|null $aliases
  * @property array<int, string>|null $keywords
@@ -31,7 +33,7 @@ class Stock extends Model
     use HasFactory;
 
     protected $fillable = [
-        'symbol', 'name', 'market', 'exchange', 'currency',
+        'symbol', 'name', 'market', 'exchange', 'tradingview_symbol', 'currency',
         'logo_url', 'sector', 'industry', 'market_cap', 'website', 'description',
         'company_profile', 'profile_synced_at', 'aliases', 'keywords', 'is_active',
     ];
@@ -119,6 +121,40 @@ class Stock extends Model
     }
 
     /**
+     * @return HasMany<StockIndexMembership, $this>
+     */
+    public function indexMemberships(): HasMany
+    {
+        return $this->hasMany(StockIndexMembership::class);
+    }
+
+    /**
+     * Index keys this stock currently belongs to (e.g. ['nasdaq100', 'sp500']).
+     *
+     * @return array<int, string>
+     */
+    public function currentIndexKeys(): array
+    {
+        return $this->indexMemberships
+            ->where('is_current', true)
+            ->pluck('index_key')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Builder<Stock>  $query
+     */
+    public function scopeInIndex(Builder $query, StockIndex|string $index): void
+    {
+        $key = $index instanceof StockIndex ? $index->value : $index;
+
+        $query->whereHas('indexMemberships', fn (Builder $q) => $q
+            ->where('index_key', $key)
+            ->where('is_current', true));
+    }
+
+    /**
      * @return HasMany<NewsStockMatch, $this>
      */
     public function newsMatches(): HasMany
@@ -143,6 +179,31 @@ class Stock extends Model
         return $this->belongsToMany(User::class, 'watchlists')
             ->withPivot(['alerts_enabled'])
             ->withTimestamps();
+    }
+
+    /**
+     * The "EXCHANGE:SYMBOL" ticker for the TradingView widget. Uses the stored
+     * value when present (set during sync), otherwise computes it from the
+     * market + symbol (dots kept for class shares, e.g. NASDAQ:BRK.B).
+     */
+    public function tradingViewSymbol(): string
+    {
+        if (is_string($this->tradingview_symbol) && trim($this->tradingview_symbol) !== '') {
+            return $this->tradingview_symbol;
+        }
+
+        return self::tradingViewSymbolFor($this->market, $this->symbol);
+    }
+
+    /**
+     * Build "EXCHANGE:SYMBOL" for TradingView. Our stored symbols use a dash for
+     * class shares (BRK-B) but TradingView expects a dot (BRK.B), so convert it.
+     */
+    public static function tradingViewSymbolFor(Market $market, string $symbol): string
+    {
+        $clean = preg_replace('/[^A-Z0-9.]/', '', str_replace('-', '.', mb_strtoupper($symbol))) ?? '';
+
+        return "{$market->tradingViewExchange()}:{$clean}";
     }
 
     /**

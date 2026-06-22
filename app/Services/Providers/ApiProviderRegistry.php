@@ -281,7 +281,7 @@ class ApiProviderRegistry
 
         return match ($provider->key) {
             'finnhub', 'twelvedata', self::SYNTHETIC_MARKET_KEY => self::MARKET_DATA_FETCH_CAPABILITIES,
-            'fmp' => ['list', 'profiles'],
+            'fmp' => ['list', 'profiles', 'index_constituents'],
             'rapidapi-bist100' => ['list', 'quotes'],
             'finnhub-news', 'kap', 'rss', self::SYNTHETIC_NEWS_KEY => ['news'],
             default => [],

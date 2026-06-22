@@ -31,7 +31,7 @@ class CheckProviderHealthCommand extends Command
 
                 // Transitions, event logging and admin notifications happen here.
                 $ok
-                    ? $health->recordSuccess($provider->key, 'health_check')
+                    ? $health->recordSuccess($provider->key, 'health_check', $latency)
                     : $health->recordFailure($provider->key, $error ?? 'unreachable');
 
                 $this->line("{$provider->key}: ".($ok ? 'ok' : 'fail').($latency !== null ? " ({$latency}ms)" : ''));

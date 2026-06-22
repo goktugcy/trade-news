@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             ApiProviderSeeder::class,
             AiTaskSeeder::class,
             StockSeeder::class,
+            UsIndexUniverseSeeder::class,
             DemoContentSeeder::class,
         ]);
     }

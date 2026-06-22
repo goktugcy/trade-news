@@ -26,6 +26,10 @@ use Illuminate\Support\Carbon;
  * @property bool $auto_recovery
  * @property int $consecutive_failures
  * @property int $consecutive_successes
+ * @property int $daily_request_count
+ * @property int $daily_failure_count
+ * @property Carbon|null $daily_counts_on
+ * @property int|null $avg_latency_ms
  * @property string|null $base_url
  * @property string|null $api_key
  * @property int $priority
@@ -47,7 +51,8 @@ class ApiProvider extends Model
         'key', 'name', 'type', 'markets', 'capabilities', 'status', 'is_active',
         'auto_sync_stocks', 'auto_recovery', 'consecutive_failures', 'consecutive_successes', 'base_url', 'api_key',
         'priority', 'refresh_interval_minutes', 'fetch_limit',
-        'last_checked_at', 'last_fetched_at', 'last_latency_ms',
+        'last_checked_at', 'last_fetched_at', 'last_latency_ms', 'avg_latency_ms',
+        'daily_request_count', 'daily_failure_count', 'daily_counts_on',
         'last_error', 'meta',
     ];
 
@@ -77,6 +82,10 @@ class ApiProvider extends Model
             'last_checked_at' => 'datetime',
             'last_fetched_at' => 'datetime',
             'last_latency_ms' => 'integer',
+            'avg_latency_ms' => 'integer',
+            'daily_request_count' => 'integer',
+            'daily_failure_count' => 'integer',
+            'daily_counts_on' => 'date',
             'meta' => 'array',
         ];
     }

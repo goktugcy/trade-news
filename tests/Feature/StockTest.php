@@ -26,16 +26,53 @@ it('lists stocks for authenticated users', function () {
         ->assertInertia(fn (Assert $page) => $page->component('stocks/Index')->has('stocks', 4));
 });
 
-it('shows a stock detail page bound by symbol', function () {
+it('shows a stock detail page bound by symbol with market status and alert options', function () {
     $user = User::factory()->create();
-    $stock = Stock::factory()->create(['symbol' => 'AAPL']);
+    $stock = Stock::factory()->nasdaq()->create(['symbol' => 'AAPL']);
 
     $this->actingAs($user)
         ->get('/stocks/AAPL')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('stocks/Show')
-            ->where('stock.symbol', 'AAPL'));
+            ->where('stock.symbol', 'AAPL')
+            ->where('stock.tradingview_symbol', 'NASDAQ:AAPL')
+            ->has('marketStatus.session_label')
+            ->has('alertTypes')
+            ->has('stockAlerts')
+            ->has('recentActivity'));
+});
+
+it('creates a stock alert from the detail page and lists it', function () {
+    $user = User::factory()->create();
+    $stock = Stock::factory()->nasdaq()->create(['symbol' => 'AAPL']);
+
+    $this->actingAs($user)
+        ->post('/alerts/stock', [
+            'stock_id' => $stock->id,
+            'type' => 'price_above',
+            'threshold' => 250,
+        ])
+        ->assertRedirect();
+
+    expect($user->stockAlerts()->where('stock_id', $stock->id)->where('type', 'price_above')->exists())->toBeTrue();
+
+    $this->actingAs($user)
+        ->get('/stocks/AAPL')
+        ->assertInertia(fn (Assert $page) => $page->component('stocks/Show')->has('stockAlerts', 1));
+});
+
+it('renders the admin market data monitoring page', function () {
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)
+        ->get('/admin/market-data')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('admin/MarketDataMonitoring')
+            ->has('providers')
+            ->has('freshness')
+            ->has('index_counts.nasdaq100'));
 });
 
 it('does not show synthetic prices when the synthetic provider is disabled', function () {

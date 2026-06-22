@@ -9,6 +9,7 @@ const tabs = [
     { title: 'Stocks', href: '/admin/stocks' },
     { title: 'News Sources', href: '/admin/news-sources' },
     { title: 'API Providers', href: '/admin/providers' },
+    { title: 'Market Data', href: '/admin/market-data' },
     { title: 'AI Settings', href: '/admin/ai-settings' },
     { title: 'Provider Events', href: '/admin/provider-events' },
     { title: 'Sync Logs', href: '/admin/sync-logs' },

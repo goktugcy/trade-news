@@ -221,7 +221,7 @@ class UsIndexUniverseService
     /**
      * @param  array<int, string>  $sp500
      * @param  array<int, string>  $nasdaq100
-     * @return array{symbols: array<int, string>, source: string, sp500_count: int, nasdaq100_count: int}
+     * @return array{symbols: array<int, string>, source: string, sp500_count: int, nasdaq100_count: int, sp500_symbols: array<int, string>, nasdaq100_symbols: array<int, string>}
      */
     private function result(string $source, array $sp500, array $nasdaq100): array
     {
@@ -233,6 +233,8 @@ class UsIndexUniverseService
             'source' => $source,
             'sp500_count' => count($sp500),
             'nasdaq100_count' => count($nasdaq100),
+            'sp500_symbols' => $sp500,
+            'nasdaq100_symbols' => $nasdaq100,
         ];
     }
 

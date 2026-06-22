@@ -6,10 +6,13 @@ namespace App\Services\Sync;
 
 use App\Enums\Market;
 use App\Enums\NotificationCategory;
+use App\Enums\StockIndex;
 use App\Models\Stock;
+use App\Models\StockIndexMembership;
 use App\Models\SyncRun;
 use App\Services\Notification\NotificationCenter;
 use App\Services\Providers\ProviderHealthService;
+use Illuminate\Support\Collection;
 use Throwable;
 
 /**
@@ -61,12 +64,25 @@ class NasdaqSyncService
 
                 Stock::query()->updateOrCreate(
                     ['market' => Market::NASDAQ->value, 'symbol' => $symbol],
-                    ['name' => $name, 'exchange' => 'NASDAQ', 'currency' => 'USD', 'is_active' => true, 'aliases' => [$symbol, $name]],
+                    [
+                        'name' => $name,
+                        'exchange' => 'NASDAQ',
+                        'tradingview_symbol' => Stock::tradingViewSymbolFor(Market::NASDAQ, $symbol),
+                        'currency' => 'USD',
+                        'is_active' => true,
+                        'aliases' => [$symbol, $name],
+                    ],
                 );
 
                 $existing->has($symbol) ? $updated++ : $created++;
                 $processed++;
             }
+
+            // Persist per-index membership (history-preserving) then deactivate
+            // index-managed stocks that dropped out of every index.
+            $this->syncIndexMembership(StockIndex::Sp500, $universe['sp500_symbols'] ?? []);
+            $this->syncIndexMembership(StockIndex::Nasdaq100, $universe['nasdaq100_symbols'] ?? []);
+            $deactivated = $this->deactivateDroppedStocks();
 
             return $this->finish($run, $processed, $created, $updated, [
                 'universe_source' => $universe['source'],
@@ -74,6 +90,7 @@ class NasdaqSyncService
                 'sp500_count' => $universe['sp500_count'],
                 'nasdaq100_count' => $universe['nasdaq100_count'],
                 'skipped_by_universe' => $skippedByUniverse,
+                'deactivated' => $deactivated,
             ]);
         } catch (Throwable $e) {
             if ($this->isUnavailableFmpListEndpoint($e)) {
@@ -133,6 +150,73 @@ class NasdaqSyncService
         } catch (Throwable $e) {
             return $this->failRun($run, $e);
         }
+    }
+
+    /**
+     * Upsert current membership for one index and retire any stock that left it
+     * (is_current=false + removed_at) without deleting the historical row.
+     *
+     * @param  array<int, string>  $symbols
+     */
+    private function syncIndexMembership(StockIndex $index, array $symbols): void
+    {
+        $now = now();
+        $symbols = array_values(array_unique(array_map(
+            fn (string $s): string => mb_strtoupper($s),
+            $symbols,
+        )));
+
+        /** @var Collection<string, int> $stockIds */
+        $stockIds = Stock::query()
+            ->where('market', Market::NASDAQ->value)
+            ->whereIn('symbol', $symbols)
+            ->pluck('id', 'symbol');
+
+        if ($stockIds->isEmpty()) {
+            return;
+        }
+
+        $existing = StockIndexMembership::query()
+            ->where('index_key', $index->value)
+            ->get()
+            ->keyBy('stock_id');
+
+        foreach ($stockIds as $id) {
+            $membership = $existing->get($id) ?? new StockIndexMembership([
+                'stock_id' => $id,
+                'index_key' => $index->value,
+            ]);
+
+            // Stamp added_at when first joining (or rejoining after a removal).
+            if (! $membership->exists || ! $membership->is_current) {
+                $membership->added_at = $now;
+            }
+
+            $membership->is_current = true;
+            $membership->removed_at = null;
+            $membership->save();
+        }
+
+        // Retire memberships whose stock is no longer in this index.
+        StockIndexMembership::query()
+            ->where('index_key', $index->value)
+            ->where('is_current', true)
+            ->whereNotIn('stock_id', $stockIds->values()->all())
+            ->update(['is_current' => false, 'removed_at' => $now]);
+    }
+
+    /**
+     * Mark index-managed NASDAQ stocks that no longer belong to any current
+     * index as inactive (never deleted, so history/references survive).
+     */
+    private function deactivateDroppedStocks(): int
+    {
+        return Stock::query()
+            ->where('market', Market::NASDAQ->value)
+            ->where('is_active', true)
+            ->whereHas('indexMemberships')
+            ->whereDoesntHave('indexMemberships', fn ($q) => $q->where('is_current', true))
+            ->update(['is_active' => false]);
     }
 
     private function startRun(string $type): SyncRun

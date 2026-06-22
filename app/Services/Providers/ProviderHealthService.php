@@ -24,7 +24,7 @@ class ProviderHealthService
         private readonly NotificationCenter $notifications,
     ) {}
 
-    public function recordSuccess(string $key, ?string $context = null): void
+    public function recordSuccess(string $key, ?string $context = null, ?int $latencyMs = null): void
     {
         $provider = $this->activeProvider($key);
 
@@ -35,6 +35,8 @@ class ProviderHealthService
         $provider->consecutive_failures = 0;
         $provider->consecutive_successes++;
         $provider->last_error = null;
+        $this->countRequest($provider, failed: false);
+        $this->updateAvgLatency($provider, $latencyMs);
 
         $target = $provider->status;
 
@@ -64,6 +66,7 @@ class ProviderHealthService
         $provider->consecutive_successes = 0;
         $provider->consecutive_failures++;
         $provider->last_error = mb_substr($error, 0, 1000);
+        $this->countRequest($provider, failed: true);
 
         $target = match (true) {
             $provider->consecutive_failures >= $this->threshold('down_after') => ProviderStatus::Down,
@@ -149,6 +152,43 @@ class ProviderHealthService
         }
 
         return $provider;
+    }
+
+    /**
+     * Increment today's request (and optionally failure) counter, resetting the
+     * running totals when the day rolls over.
+     */
+    private function countRequest(ApiProvider $provider, bool $failed): void
+    {
+        $today = now()->toDateString();
+
+        if ($provider->daily_counts_on?->toDateString() !== $today) {
+            $provider->daily_counts_on = now();
+            $provider->daily_request_count = 0;
+            $provider->daily_failure_count = 0;
+        }
+
+        $provider->daily_request_count++;
+
+        if ($failed) {
+            $provider->daily_failure_count++;
+        }
+    }
+
+    /**
+     * Fold the latest probe latency into a rolling average (EMA). No-op when the
+     * caller didn't measure latency (e.g. sync-driven success/failure).
+     */
+    private function updateAvgLatency(ApiProvider $provider, ?int $latencyMs): void
+    {
+        if ($latencyMs === null || $latencyMs < 0) {
+            return;
+        }
+
+        $current = $provider->avg_latency_ms;
+        $provider->avg_latency_ms = $current === null
+            ? $latencyMs
+            : (int) round(($current * 0.7) + ($latencyMs * 0.3));
     }
 
     private function threshold(string $name): int

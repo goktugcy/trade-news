@@ -4,13 +4,20 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\ProviderType;
+use App\Enums\StockIndex;
 use App\Http\Controllers\Controller;
+use App\Models\ApiProvider;
 use App\Models\Notification;
 use App\Models\ProviderEvent;
+use App\Models\Stock;
+use App\Models\StockIndexMembership;
+use App\Models\StockPrice;
 use App\Models\SyncRun;
 use App\Models\SystemJob;
 use App\Models\UserNotification;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -146,6 +153,62 @@ class AdminSystemController extends Controller
         return Inertia::render('admin/SyncLogs', [
             'runs' => $runs,
             'summary' => $summary,
+        ]);
+    }
+
+    /**
+     * Market-data monitoring: provider usage/health, sync freshness, index sizes.
+     */
+    public function marketData(): Response
+    {
+        $providers = ApiProvider::query()
+            ->where('type', ProviderType::MarketData->value)
+            ->orderBy('priority')
+            ->get()
+            ->map(fn (ApiProvider $p): array => [
+                'key' => $p->key,
+                'name' => $p->name,
+                'status' => $p->status->value,
+                'status_color' => $p->status->color(),
+                'is_active' => $p->is_active,
+                'markets' => $p->markets ?? [],
+                'capabilities' => $p->capabilities ?? [],
+                'daily_request_count' => $p->daily_request_count,
+                'daily_failure_count' => $p->daily_failure_count,
+                'avg_latency_ms' => $p->avg_latency_ms,
+                'last_latency_ms' => $p->last_latency_ms,
+                'rate_limited' => str_contains((string) $p->last_error, '429'),
+                'consecutive_failures' => $p->consecutive_failures,
+                'last_error' => $p->last_error,
+                'last_checked_at' => $p->last_checked_at?->diffForHumans(),
+            ])
+            ->all();
+
+        $freshness = (new Collection(['nasdaq_list', 'company_profiles', 'bist100_quotes']))
+            ->map(function (string $type): array {
+                $last = SyncRun::query()->where('type', $type)->latest('id')->first();
+
+                return [
+                    'type' => $type,
+                    'status' => $last?->status,
+                    'finished_at' => $last?->finished_at?->diffForHumans(),
+                    'processed' => $last?->processed,
+                ];
+            })->all();
+
+        $latestPriceAt = StockPrice::query()->max('created_at');
+
+        return Inertia::render('admin/MarketDataMonitoring', [
+            'providers' => $providers,
+            'freshness' => $freshness,
+            'quote_freshness' => $latestPriceAt
+                ? Carbon::parse($latestPriceAt)->diffForHumans()
+                : null,
+            'index_counts' => [
+                'nasdaq100' => StockIndexMembership::query()->where('index_key', StockIndex::Nasdaq100->value)->where('is_current', true)->count(),
+                'sp500' => StockIndexMembership::query()->where('index_key', StockIndex::Sp500->value)->where('is_current', true)->count(),
+                'active_stocks' => Stock::query()->where('is_active', true)->count(),
+            ],
         ]);
     }
 

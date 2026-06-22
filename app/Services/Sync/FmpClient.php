@@ -81,6 +81,19 @@ class FmpClient
     }
 
     /**
+     * Current NASDAQ-100 constituents, proxied via the configured tracking ETF
+     * (QQQ) since FMP has no dedicated nasdaq100-constituent endpoint.
+     *
+     * @return array<int|string, mixed>
+     */
+    public function nasdaq100Constituents(): array
+    {
+        return $this->etfHoldings(
+            (string) config('tradenews.sync.us_universe.nasdaq100_etf', 'QQQ'),
+        );
+    }
+
+    /**
      * Company profile for a symbol, or null if FMP has none.
      *
      * @return array<string, mixed>|null

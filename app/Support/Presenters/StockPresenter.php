@@ -40,6 +40,7 @@ class StockPresenter
             'name' => $stock->name,
             'market' => $stock->market->value,
             'exchange' => $stock->exchange,
+            'tradingview_symbol' => $stock->tradingViewSymbol(),
             'currency' => $stock->currency,
             'sector' => $stock->sector,
             'industry' => $stock->industry,

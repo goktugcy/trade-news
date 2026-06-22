@@ -34,6 +34,18 @@ enum Market: string
     }
 
     /**
+     * The TradingView exchange prefix used to build chart/quote widget symbols
+     * (e.g. NASDAQ:AAPL, BIST:THYAO).
+     */
+    public function tradingViewExchange(): string
+    {
+        return match ($this) {
+            self::BIST => 'BIST',
+            self::NASDAQ => 'NASDAQ',
+        };
+    }
+
+    /**
      * Local market open/close in the market's own timezone (24h "H:i").
      *
      * @return array{open: string, close: string}

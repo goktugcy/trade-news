@@ -6,6 +6,9 @@ import { useAppearance } from '@/composables/useAppearance';
 const props = defineProps<{
     symbol: string;
     market: string;
+    // Server-computed "EXCHANGE:SYMBOL" (stocks.tradingview_symbol); falls back
+    // to client-side mapping when absent.
+    tradingviewSymbol?: string | null;
 }>();
 
 const { locale } = useI18n();
@@ -13,9 +16,13 @@ const { resolvedAppearance } = useAppearance();
 
 const container = ref<HTMLDivElement | null>(null);
 
-// Map a stock to its TradingView "EXCHANGE:SYMBOL" ticker. Dots are kept for
+// Prefer the server-provided ticker; otherwise map locally. Dots are kept for
 // class shares (e.g. BRK.B); anything else non-alphanumeric is stripped.
 function tvSymbol(): string {
+    if (props.tradingviewSymbol && props.tradingviewSymbol.trim() !== '') {
+        return props.tradingviewSymbol;
+    }
+
     const exchange = props.market === 'BIST' ? 'BIST' : 'NASDAQ';
     const clean = props.symbol.toUpperCase().replace(/[^A-Z0-9.]/g, '');
 
@@ -69,7 +76,7 @@ function render(): void {
 onMounted(render);
 
 watch(
-    () => [props.symbol, props.market, resolvedAppearance.value, locale.value],
+    () => [props.symbol, props.market, props.tradingviewSymbol, resolvedAppearance.value, locale.value],
     render,
 );
 

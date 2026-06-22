@@ -6,6 +6,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Stock detail chart
+    |--------------------------------------------------------------------------
+    |
+    | The stock detail page embeds a TradingView widget (data + charting come
+    | from TradingView, so we don't sync historical OHLCV for it). `provider`
+    | is configurable for future extension; internal OHLCV charting stays off
+    | by default.
+    |
+    */
+
+    'chart' => [
+        'provider' => env('STOCK_CHART_PROVIDER', 'tradingview'),
+        'historical_ohlcv_enabled' => (bool) env('STOCK_HISTORICAL_OHLCV_ENABLED', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Market data provider
     |--------------------------------------------------------------------------
     |

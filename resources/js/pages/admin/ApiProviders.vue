@@ -27,6 +27,10 @@ type Provider = {
     fetch_limit: number;
     base_url: string | null;
     last_latency_ms: number | null;
+    avg_latency_ms: number | null;
+    daily_request_count: number;
+    daily_failure_count: number;
+    rate_limited: boolean;
     last_error: string | null;
     last_checked_at: string | null;
     last_fetched_at: string | null;
@@ -177,7 +181,10 @@ function purgeSynthetic() {
                         <span>prio {{ p.priority }}</span>
                         <span>{{ p.refresh_interval_minutes }}m · limit {{ p.fetch_limit }}</span>
                         <span class="tabular-nums">{{ p.last_latency_ms !== null ? p.last_latency_ms + ' ms' : '— ms' }}</span>
+                        <span v-if="p.avg_latency_ms !== null" class="tabular-nums">avg {{ p.avg_latency_ms }} ms</span>
+                        <span class="tabular-nums">today {{ p.daily_request_count }} req<span v-if="p.daily_failure_count > 0">, {{ p.daily_failure_count }} fail</span></span>
                         <span v-if="p.consecutive_failures > 0" class="text-rose-600 dark:text-rose-400">{{ p.consecutive_failures }} fails</span>
+                        <span v-if="p.rate_limited" class="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">rate-limited</span>
                         <span v-if="p.auto_recovery">auto-recovery</span>
                         <span v-if="p.last_checked_at">checked {{ p.last_checked_at }}</span>
                     </div>

@@ -55,6 +55,7 @@ Route::middleware(['auth', 'verified', 'admin'])
 
         // Provider event history, sync logs, system notification center
         Route::get('provider-events', [AdminSystemController::class, 'providerEvents'])->name('provider-events.index');
+        Route::get('market-data', [AdminSystemController::class, 'marketData'])->name('market-data.index');
         Route::get('sync-logs', [AdminSystemController::class, 'syncLogs'])->name('sync-logs.index');
         Route::get('system-notifications', [AdminSystemController::class, 'systemNotifications'])->name('system-notifications.index');
 
