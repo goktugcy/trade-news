@@ -16,48 +16,32 @@ function maxId(items: NewsCardData[]): number {
 }
 
 /**
- * Twitter-style live feed over polling. A persisted "seen" high-water-mark (by
- * id, which is monotonic) guarantees that items the user has already loaded —
- * via SSR or by tapping the pill — never come back as "new" after a refresh.
- * Updates to already-visible cards (translation, sentiment, counts) merge in place.
+ * Twitter-style live feed over polling. New items (id greater than what's on
+ * screen) surface as a "+N new" pill the reader taps to prepend them.
+ *
+ * The high-water-mark is derived purely from the SSR-rendered feed (its newest
+ * id), NOT persisted — the feed always renders newest-first, so the on-screen
+ * max IS the correct cursor. (Persisting it broke polling whenever the dev DB
+ * was reseeded to lower ids: the stale-high cursor made `id > seen` match
+ * nothing while a full refresh still showed the new rows.)
  */
 export function useLiveNewsFeed(opts: Options): {
     items: Ref<NewsCardData[]>;
     pendingCount: ComputedRef<number>;
     flush: () => void;
 } {
-    const storageKey = `tn:seen:${opts.scope}:${JSON.stringify(opts.filters?.() ?? {})}`;
-
-    function readSeen(): number {
-        try {
-            return Number(window.localStorage.getItem(storageKey) ?? 0) || 0;
-        } catch {
-            return 0;
-        }
-    }
-
-    function writeSeen(id: number): void {
-        try {
-            window.localStorage.setItem(storageKey, String(id));
-        } catch {
-            // storage unavailable — fall back to in-memory cursor only
-        }
-    }
-
     const items = ref<NewsCardData[]>([...opts.initial()]);
     const pending = ref<NewsCardData[]>([]);
     const pendingCount = computed(() => pending.value.length);
 
-    // SSR items are "seen"; never offer anything at or below this id again.
-    let seen = Math.max(maxId(items.value), readSeen());
-    writeSeen(seen);
+    // Cursor: highest id already on screen. Anything above it is "new".
+    let seen = maxId(items.value);
 
-    // New SSR data (navigation / filter change) resets the visible list.
+    // New SSR data (navigation / filter change) resets the visible list + cursor.
     watch(opts.initial, (next) => {
         items.value = [...next];
         pending.value = [];
-        seen = Math.max(seen, maxId(next));
-        writeSeen(seen);
+        seen = maxId(next);
     });
 
     function applyUpdates(updates: NewsCardData[]): void {
@@ -89,6 +73,7 @@ export function useLiveNewsFeed(opts: Options): {
             const res = await fetch(`/news/live?${params.toString()}`, {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
+                cache: 'no-store',
             });
 
             if (!res.ok) {
@@ -107,9 +92,21 @@ export function useLiveNewsFeed(opts: Options): {
             if (fresh.length) {
                 pending.value = [...fresh, ...pending.value];
             }
+
+            // While the reader is at the top of the feed, new items stream in
+            // automatically (no pill to dismiss). Once they scroll down, items
+            // buffer behind the "+N new" pill so the list never jumps under them;
+            // scrolling back to the top auto-reveals on the next poll.
+            if (pending.value.length > 0 && isAtTop()) {
+                flush();
+            }
         } catch {
             // network hiccup — keep last known values
         }
+    }
+
+    function isAtTop(): boolean {
+        return typeof window !== 'undefined' && window.scrollY < 200;
     }
 
     useVisibilityAwarePoll(poll, opts.intervalMs ?? 15000);
@@ -119,9 +116,8 @@ export function useLiveNewsFeed(opts: Options): {
             return;
         }
 
-        // Mark the revealed items as seen so a refresh won't re-offer them.
+        // Revealed items become the new high-water-mark so they aren't re-offered.
         seen = Math.max(seen, maxId(pending.value));
-        writeSeen(seen);
 
         items.value = [...pending.value, ...items.value];
         pending.value = [];
