@@ -169,7 +169,13 @@ class NewsController extends Controller
                         ->orWhere('summary', 'ILIKE', "%{$search}%")
                         ->orWhereHas('stocks', fn (Builder $s) => $s->where('symbol', 'ILIKE', "%{$search}%"));
                 });
-            });
+            })
+            // Order by id (ingestion order), not published_at: the live "+N new"
+            // pill tracks a monotonic id high-water-mark, so the displayed feed
+            // must agree with it. Ordering by published_at let late-ingested but
+            // older articles (higher id, older timestamp) sit forever above the
+            // page-1 id ceiling, making the pill show phantom/stuck counts.
+            ->reorder('id', 'desc');
     }
 
     /**

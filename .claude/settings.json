@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(php -l app/Http/Controllers/NewsController.php)",
-      "Bash(php -l app/Http/Controllers/StockController.php)"
+      "Bash(php -l app/Http/Controllers/StockController.php)",
+      "Bash(grep -n 'Timeframe::OneDay\\\\|in_array\\($range' app/Http/Controllers/StockController.php)"
     ]
   }
 }

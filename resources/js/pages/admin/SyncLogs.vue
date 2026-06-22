@@ -11,6 +11,7 @@ type Run = {
     created_count: number;
     updated_count: number;
     error: string | null;
+    detail: string | null;
     started_at: string | null;
     finished_at: string | null;
 };
@@ -60,6 +61,7 @@ const statusClass = (s: string): string =>
                 <thead class="border-b border-sidebar-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground dark:border-sidebar-border">
                     <tr>
                         <th class="px-4 py-2.5 font-medium">Type</th>
+                        <th class="px-4 py-2.5 font-medium">Detail</th>
                         <th class="px-4 py-2.5 font-medium">Status</th>
                         <th class="px-4 py-2.5 text-right font-medium">Processed</th>
                         <th class="px-4 py-2.5 text-right font-medium">New / Upd</th>
@@ -69,6 +71,7 @@ const statusClass = (s: string): string =>
                 <tbody class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
                     <tr v-for="r in runs.data" :key="r.id">
                         <td class="px-4 py-2.5 capitalize text-foreground">{{ r.type.replace('_', ' ') }}</td>
+                        <td class="px-4 py-2.5 text-muted-foreground">{{ r.detail ?? '—' }}</td>
                         <td class="px-4 py-2.5">
                             <span class="rounded px-1.5 py-0.5 text-[10px] font-medium" :class="statusClass(r.status)">{{ r.status }}</span>
                             <span v-if="r.error" class="ml-2 text-xs text-rose-600 dark:text-rose-400">{{ r.error }}</span>
@@ -78,7 +81,7 @@ const statusClass = (s: string): string =>
                         <td class="px-4 py-2.5 text-muted-foreground">{{ r.finished_at ?? '—' }}</td>
                     </tr>
                     <tr v-if="runs.data.length === 0">
-                        <td colspan="5" class="px-4 py-10 text-center text-muted-foreground">No sync runs yet.</td>
+                        <td colspan="6" class="px-4 py-10 text-center text-muted-foreground">No sync runs yet.</td>
                     </tr>
                 </tbody>
             </table>

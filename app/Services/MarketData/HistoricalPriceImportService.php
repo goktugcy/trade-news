@@ -306,6 +306,82 @@ class HistoricalPriceImportService
         ];
     }
 
+    /**
+     * Import a single-symbol daily OHLC CSV (the shape stooq.com returns from
+     * its download endpoint: `Date,Open,High,Low,Close,Volume`) for a known
+     * stock as 1d candles. Reuses the same parse/upsert pipeline as uploads.
+     *
+     * @return array{source: string, processed: int, imported: int, created: int, updated: int, skipped: int, stocks_created: int, errors: array<int, string>}
+     */
+    public function importDailyCsv(Stock $stock, string $csv, string $providerKey = StockPrice::PROVIDER_STOOQ_API): array
+    {
+        $summary = $this->summary($providerKey);
+        $tmp = tempnam(sys_get_temp_dir(), 'stooq_');
+
+        if ($tmp === false || file_put_contents($tmp, $csv) === false) {
+            $this->pushError($summary, 'Could not buffer downloaded CSV.');
+
+            return $summary;
+        }
+
+        try {
+            $file = $this->openCsvPath($tmp);
+            $header = $this->readHeader($file);
+
+            $dateColumn = array_key_exists('datetime', $header) ? 'datetime' : 'date';
+
+            $this->ensureColumns($header, [$dateColumn, 'open', 'high', 'low', 'close']);
+
+            $timeframe = Timeframe::OneDay;
+            $rows = [];
+
+            while (! $file->eof()) {
+                $line = $file->key();
+                $row = $file->fgetcsv();
+
+                if ($this->isEmptyRow($row)) {
+                    continue;
+                }
+
+                $summary['processed']++;
+                $lineNumber = $line + 1;
+
+                try {
+                    $priceAt = $this->bucketTime(
+                        $this->parseManualTimestamp($this->rowValue($row, $header, $dateColumn), $stock->market),
+                        $timeframe,
+                    );
+
+                    $rows[] = $this->priceRow(
+                        stockId: $stock->id,
+                        timeframe: $timeframe,
+                        providerKey: $providerKey,
+                        priceAt: $priceAt,
+                        open: $this->requiredNumber($this->rowValue($row, $header, 'open'), 'open'),
+                        high: $this->requiredNumber($this->rowValue($row, $header, 'high'), 'high'),
+                        low: $this->requiredNumber($this->rowValue($row, $header, 'low'), 'low'),
+                        close: $this->requiredNumber($this->rowValue($row, $header, 'close'), 'close'),
+                        volume: $this->parseNumber($this->rowValue($row, $header, 'volume')) ?? 0.0,
+                    );
+                } catch (Throwable $e) {
+                    $this->skip($summary, $lineNumber, $e->getMessage());
+
+                    continue;
+                }
+
+                $this->flushWhenFull($rows, $summary);
+            }
+
+            $this->flushRows($rows, $summary);
+        } catch (ValidationException $e) {
+            $this->pushError($summary, $this->validationMessage($e));
+        } finally {
+            @unlink($tmp);
+        }
+
+        return $summary;
+    }
+
     private function openCsv(UploadedFile $file): SplFileObject
     {
         $path = $file->getRealPath();
@@ -314,6 +390,11 @@ class HistoricalPriceImportService
             throw ValidationException::withMessages(['file' => 'Uploaded file could not be read.']);
         }
 
+        return $this->openCsvPath($path);
+    }
+
+    private function openCsvPath(string $path): SplFileObject
+    {
         $csv = new SplFileObject($path);
         $csv->setFlags(SplFileObject::READ_CSV | SplFileObject::SKIP_EMPTY | SplFileObject::DROP_NEW_LINE);
         $csv->setCsvControl($this->detectDelimiter($path));

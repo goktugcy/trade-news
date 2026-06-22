@@ -131,11 +131,12 @@ class AdminSystemController extends Controller
                 'created_count' => $r->created_count,
                 'updated_count' => $r->updated_count,
                 'error' => $r->error,
+                'detail' => $this->syncRunDetail($r),
                 'started_at' => $r->started_at?->toDateTimeString(),
                 'finished_at' => $r->finished_at?->toDateTimeString(),
             ]);
 
-        $summary = (new Collection(['nasdaq_list', 'company_profiles']))->mapWithKeys(fn (string $type) => [
+        $summary = (new Collection(['nasdaq_list', 'company_profiles', 'stooq_history', 'manual_import', 'bulk_import']))->mapWithKeys(fn (string $type) => [
             $type => [
                 'last_success' => SyncRun::lastOfStatus($type, SyncRun::STATUS_SUCCESS)?->finished_at?->diffForHumans(),
                 'last_failure' => SyncRun::lastOfStatus($type, SyncRun::STATUS_FAILED)?->finished_at?->diffForHumans(),
@@ -146,6 +147,24 @@ class AdminSystemController extends Controller
             'runs' => $runs,
             'summary' => $summary,
         ]);
+    }
+
+    /**
+     * Human-readable detail for a sync run (e.g. the imported stock symbol or a
+     * "no data" note), pulled from its meta payload.
+     */
+    private function syncRunDetail(SyncRun $run): ?string
+    {
+        $meta = $run->meta ?? [];
+
+        $parts = array_filter([
+            $meta['symbol'] ?? null,
+            isset($meta['files']) ? "{$meta['files']} file(s)" : null,
+            $meta['note'] ?? null,
+            (isset($meta['skipped']) && (int) $meta['skipped'] > 0) ? "{$meta['skipped']} skipped" : null,
+        ]);
+
+        return $parts === [] ? null : implode(' · ', $parts);
     }
 
     public function systemNotifications(): Response

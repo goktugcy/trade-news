@@ -45,6 +45,8 @@ class StockPrice extends Model
 
     public const PROVIDER_STOOQ_UPLOAD = 'stooq-upload';
 
+    public const PROVIDER_STOOQ_API = 'stooq-api';
+
     protected $fillable = [
         'stock_id', 'timeframe', 'provider_key', 'source_kind',
         'open', 'high', 'low', 'close', 'volume', 'price_at',

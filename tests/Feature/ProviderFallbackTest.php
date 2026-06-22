@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\ProviderType;
+use App\Enums\Timeframe;
 use App\Models\ApiProvider;
 use App\Models\Stock;
 use App\Models\User;
 use App\Services\MarketData\MarketDataProviderInterface;
+use App\Services\MarketData\TwelveDataProvider;
 use App\Services\Providers\ApiProviderRegistry;
 use Database\Seeders\ApiProviderSeeder;
 use Illuminate\Http\Client\Request;
@@ -156,6 +158,22 @@ it('preserves provider API keys on blank update and clears them only with the cl
     $this->actingAs($admin)->put("/admin/providers/{$provider->id}", array_merge($payload, ['clear_api_key' => true]))->assertRedirect();
 
     expect($provider->fresh()->api_key)->toBeNull();
+});
+
+it('returns empty without throwing when Twelve Data is rate-limited (429)', function () {
+    Http::preventStrayRequests();
+    Http::fake([
+        'api.twelvedata.com/*' => Http::response(
+            ['code' => 429, 'message' => 'You have run out of API credits for the day.'],
+            429,
+        ),
+    ]);
+
+    $stock = Stock::factory()->nasdaq()->create(['symbol' => 'AAPL']);
+    $provider = new TwelveDataProvider('test-key');
+
+    expect($provider->getQuote($stock))->toBeNull()
+        ->and($provider->getCandles($stock, Timeframe::OneDay, 150))->toBe([]);
 });
 
 it('uses the DB provider key when constructing market data providers', function () {

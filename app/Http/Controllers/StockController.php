@@ -242,6 +242,13 @@ class StockController extends Controller
     {
         $timeframe = Timeframe::tryFrom($request->string('timeframe')->toString()) ?? Timeframe::FiveMinutes;
         $range = $this->normalizeChartRange($request->string('range')->toString());
+
+        // Long ranges only have data at daily resolution (intraday history isn't
+        // retained that far back), so force 1d so the chart never comes back empty.
+        if (in_array($range, ['1mo', '3mo', '5mo', '1y', '5y'], true)) {
+            $timeframe = Timeframe::OneDay;
+        }
+
         $rangeStart = $this->chartRangeStart($range);
         $apiActive = $providers->hasActiveRealProvider(ProviderType::MarketData);
         $hideSynthetic = $providers->shouldHideSyntheticMarketData();

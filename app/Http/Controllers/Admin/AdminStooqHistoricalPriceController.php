@@ -7,7 +7,12 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\Market;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ImportStooqHistoricalPricesRequest;
+use App\Jobs\ImportStooqHistoryJob;
+use App\Models\Stock;
+use App\Models\StockPrice;
 use App\Services\MarketData\HistoricalPriceImportService;
+use App\Services\MarketData\ImportSyncLogger;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
@@ -15,6 +20,34 @@ use Inertia\Inertia;
 
 class AdminStooqHistoricalPriceController extends Controller
 {
+    /**
+     * Queue a daily-history download from stooq.com for every active NASDAQ stock.
+     */
+    public function fetchAll(): RedirectResponse
+    {
+        $query = Stock::query()->active()->where('market', Market::NASDAQ->value);
+        $count = (clone $query)->count();
+
+        if ($count === 0) {
+            Inertia::flash('toast', ['type' => 'warning', 'message' => 'No active NASDAQ stocks to update.']);
+
+            return back();
+        }
+
+        $query->orderBy('id')->chunkById(200, function (Collection $stocks): void {
+            foreach ($stocks as $stock) {
+                ImportStooqHistoryJob::dispatch($stock->id);
+            }
+        });
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => "Queued Stooq daily history for {$count} NASDAQ stock(s). Processing in the background.",
+        ]);
+
+        return back();
+    }
+
     public function store(
         ImportStooqHistoricalPricesRequest $request,
         HistoricalPriceImportService $importer,
@@ -30,6 +63,13 @@ class AdminStooqHistoricalPriceController extends Controller
         $result = $importer->importBulkFiles(
             $files,
             $fallbackMarket === 'ALL' ? null : Market::from($fallbackMarket),
+        );
+
+        ImportSyncLogger::fromSummary(
+            ImportSyncLogger::TYPE_BULK_IMPORT,
+            StockPrice::PROVIDER_BULK_CSV,
+            $result,
+            ['files' => count($files)],
         );
 
         Inertia::flash('stock_import', $result);
