@@ -122,19 +122,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Stooq historical data (daily OHLC import for NASDAQ charts)
-    |--------------------------------------------------------------------------
-    */
-
-    'stooq' => [
-        'base_url' => env('STOOQ_BASE_URL', 'https://stooq.com'),
-        'timeout' => env('STOOQ_TIMEOUT', 30),
-        'history_years' => env('STOOQ_HISTORY_YEARS', 6),
-        'rate_limit_per_minute' => env('STOOQ_RATE_LIMIT_PER_MINUTE', 60),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Telegram bot
     |--------------------------------------------------------------------------
     */

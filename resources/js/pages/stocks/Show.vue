@@ -7,13 +7,13 @@ import LivePrice from '@/components/tradenews/LivePrice.vue';
 import MarketBadge from '@/components/tradenews/MarketBadge.vue';
 import NewsFeed from '@/components/tradenews/NewsFeed.vue';
 import PriceChange from '@/components/tradenews/PriceChange.vue';
-import StockChart from '@/components/tradenews/StockChart.vue';
+import TradingViewChart from '@/components/tradenews/TradingViewChart.vue';
 import TypewriterText from '@/components/tradenews/TypewriterText.vue';
 import { Button } from '@/components/ui/button';
 import { useLiveQuotes } from '@/composables/useLiveQuotes';
 import { formatNumber, formatPrice } from '@/lib/format';
 import { postJson } from '@/lib/http';
-import type { NewsCardData, SelectOption, StockRow } from '@/types';
+import type { NewsCardData, StockRow } from '@/types';
 
 type AiStockAnalysis = {
     signal: string;
@@ -41,8 +41,6 @@ const props = defineProps<{
     stock: StockRow;
     news: NewsCardData[];
     analysis: AiStockAnalysis | null;
-    timeframes: SelectOption[];
-    chartRanges: SelectOption[];
 }>();
 
 const { t } = useI18n();
@@ -98,29 +96,6 @@ defineOptions({
         ],
     },
 });
-
-const timeframe = ref<string>('5m');
-const range = ref<string>('latest');
-const longRangeValues = new Set(['1mo', '3mo', '5mo', '1y', '5y']);
-const intradayRangeValues = new Set(['1h', '3h', '24h']);
-
-function selectTimeframe(value: string | number) {
-    timeframe.value = String(value);
-}
-
-function selectRange(value: string | number) {
-    const nextRange = String(value);
-
-    range.value = nextRange;
-
-    if (longRangeValues.has(nextRange)) {
-        timeframe.value = '1d';
-    }
-
-    if (intradayRangeValues.has(nextRange) && timeframe.value === '1d') {
-        timeframe.value = '5m';
-    }
-}
 
 function addToWatchlist() {
     router.post('/watchlist', { stock_id: props.stock.id }, { preserveScroll: true });
@@ -189,36 +164,10 @@ function toggleAlert() {
 
         <!-- Chart -->
         <div class="rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
-            <div class="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <h2 class="text-sm font-semibold text-foreground">{{ t('stocks.priceChart') }}</h2>
-                <div class="flex flex-wrap items-center gap-2">
-                    <div class="inline-flex flex-wrap rounded-lg bg-muted p-0.5" :aria-label="t('stocks.ariaChartRange')">
-                        <button
-                            v-for="chartRange in chartRanges"
-                            :key="chartRange.value"
-                            type="button"
-                            class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
-                            :class="range === chartRange.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-                            @click="selectRange(chartRange.value)"
-                        >
-                            {{ chartRange.label }}
-                        </button>
-                    </div>
-                    <div class="inline-flex flex-wrap rounded-lg bg-muted p-0.5" :aria-label="t('stocks.ariaChartTimeframe')">
-                        <button
-                            v-for="tf in timeframes"
-                            :key="tf.value"
-                            type="button"
-                            class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
-                            :class="timeframe === tf.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-                            @click="selectTimeframe(tf.value)"
-                        >
-                            {{ tf.value }}
-                        </button>
-                    </div>
-                </div>
+            <h2 class="mb-3 text-sm font-semibold text-foreground">{{ t('stocks.priceChart') }}</h2>
+            <div class="h-[48vh] min-h-96 w-full sm:h-[54vh] xl:h-160">
+                <TradingViewChart :symbol="stock.symbol" :market="stock.market" />
             </div>
-            <StockChart :symbol="stock.symbol" :timeframe="timeframe" :range="range" />
         </div>
 
         <!-- AI analysis -->

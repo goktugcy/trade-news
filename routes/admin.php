@@ -19,9 +19,7 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::get('stocks', [AdminStockController::class, 'index'])->name('stocks.index');
         Route::post('stocks', [AdminStockController::class, 'store'])->name('stocks.store');
         Route::post('stocks/historical-prices/stooq', [AdminStooqHistoricalPriceController::class, 'store'])->name('stocks.historical-prices.stooq');
-        Route::post('stocks/historical-prices/stooq/fetch', [AdminStooqHistoricalPriceController::class, 'fetchAll'])->name('stocks.historical-prices.stooq.fetch-all');
         Route::post('stocks/{stock:id}/historical-prices', [AdminStockHistoricalPriceController::class, 'store'])->name('stocks.historical-prices.store');
-        Route::post('stocks/{stock:id}/historical-prices/stooq/fetch', [AdminStockHistoricalPriceController::class, 'fetchStooq'])->name('stocks.historical-prices.stooq.fetch');
         Route::put('stocks/{stock:id}', [AdminStockController::class, 'update'])->name('stocks.update');
         Route::delete('stocks/{stock:id}', [AdminStockController::class, 'destroy'])->name('stocks.destroy');
 

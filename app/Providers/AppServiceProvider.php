@@ -47,12 +47,6 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute($perMinute)->by('ai-summary');
         });
 
-        RateLimiter::for('stooq', function (): Limit {
-            $perMinute = max(1, (int) config('tradenews.stooq.rate_limit_per_minute', 60));
-
-            return Limit::perMinute($perMinute)->by('stooq');
-        });
-
         DB::prohibitDestructiveCommands(
             app()->isProduction(),
         );

@@ -88,13 +88,6 @@ Schedule::command('tradenews:generate-stock-analyses --scope=daily')
     ->withoutOverlapping()
     ->onOneServer();
 
-// Nightly Stooq daily-history refresh for NASDAQ (throttled per-stock by the
-// `stooq` rate limiter). Runs after the US close; fills the long-range charts.
-Schedule::command('tradenews:import-stooq-history')
-    ->dailyAt('05:30')
-    ->withoutOverlapping()
-    ->onOneServer();
-
 // Nightly cleanup of stale data + duplicate news.
 Schedule::command('tradenews:cleanup')
     ->dailyAt('03:30')

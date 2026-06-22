@@ -48,7 +48,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('stocks/search', [StockController::class, 'search'])->name('stocks.search');
     Route::get('stocks/live', [StockController::class, 'liveQuotes'])->name('stocks.live');
     Route::get('stocks/{stock}', [StockController::class, 'show'])->name('stocks.show');
-    Route::get('stocks/{stock}/candles', [StockController::class, 'candles'])->name('stocks.candles');
     Route::post('stocks/{stock}/analysis/translate', [StockController::class, 'translateAnalysis'])->name('stocks.analysis.translate');
 
     // Watchlist management

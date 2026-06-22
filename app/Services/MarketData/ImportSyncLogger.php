@@ -14,8 +14,6 @@ use Carbon\CarbonImmutable;
  */
 final class ImportSyncLogger
 {
-    public const TYPE_STOOQ_HISTORY = 'stooq_history';
-
     public const TYPE_MANUAL_IMPORT = 'manual_import';
 
     public const TYPE_BULK_IMPORT = 'bulk_import';

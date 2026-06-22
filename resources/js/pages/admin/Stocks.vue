@@ -4,7 +4,6 @@ import {
     CheckCircle2,
     Clock3,
     Database,
-    DownloadCloud,
     FileText,
     Loader2,
     Pencil,
@@ -21,14 +20,8 @@ import {
     store as storeStock,
     update as updateStock,
 } from '@/actions/App/Http/Controllers/Admin/AdminStockController';
-import {
-    fetchStooq as fetchStockStooq,
-    store as importHistoricalPrices,
-} from '@/actions/App/Http/Controllers/Admin/AdminStockHistoricalPriceController';
-import {
-    fetchAll as fetchAllStooq,
-    store as importStooqHistoricalPrices,
-} from '@/actions/App/Http/Controllers/Admin/AdminStooqHistoricalPriceController';
+import { store as importHistoricalPrices } from '@/actions/App/Http/Controllers/Admin/AdminStockHistoricalPriceController';
+import { store as importStooqHistoricalPrices } from '@/actions/App/Http/Controllers/Admin/AdminStooqHistoricalPriceController';
 import AdminNav from '@/components/tradenews/AdminNav.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -115,8 +108,6 @@ watch(search, (value) => {
 
 const dialogOpen = ref(false);
 const bulkImportOpen = ref(false);
-const stooqFetchingAll = ref(false);
-const stooqFetchingStock = ref(false);
 const editingId = ref<number | null>(null);
 const editingStock = ref<Stock | null>(null);
 const manualFileInput = ref<HTMLInputElement | null>(null);
@@ -381,46 +372,6 @@ function submitStooqImport() {
     void runBulkImportQueue();
 }
 
-function fetchAllFromStooq() {
-    if (stooqFetchingAll.value) {
-        return;
-    }
-
-    router.post(
-        fetchAllStooq.url(),
-        {},
-        {
-            preserveScroll: true,
-            onStart: () => {
-                stooqFetchingAll.value = true;
-            },
-            onFinish: () => {
-                stooqFetchingAll.value = false;
-            },
-        },
-    );
-}
-
-function fetchStockFromStooq() {
-    if (editingId.value === null || stooqFetchingStock.value) {
-        return;
-    }
-
-    router.post(
-        fetchStockStooq.url(editingId.value),
-        {},
-        {
-            preserveScroll: true,
-            onStart: () => {
-                stooqFetchingStock.value = true;
-            },
-            onFinish: () => {
-                stooqFetchingStock.value = false;
-            },
-        },
-    );
-}
-
 function openBulkImport() {
     bulkImportOpen.value = true;
 }
@@ -571,19 +522,6 @@ function importQueueItemDetail(item: ImportQueueItem): string {
                             {{ importResult.skipped }} skipped
                         </span>
                     </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        :disabled="stooqFetchingAll"
-                        @click="fetchAllFromStooq"
-                    >
-                        <Loader2
-                            v-if="stooqFetchingAll"
-                            class="size-4 animate-spin"
-                        />
-                        <DownloadCloud v-else class="size-4" />
-                        Update from Stooq (NASDAQ)
-                    </Button>
                     <Button type="button" @click="openBulkImport">
                         <UploadCloud class="size-4" />
                         Import historical data
@@ -1211,40 +1149,23 @@ function importQueueItemDetail(item: ImportQueueItem): string {
                                     />
                                 </div>
                             </div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <Button
-                                    v-if="editingStock?.market === 'NASDAQ'"
-                                    type="button"
-                                    variant="ghost"
-                                    class="w-full sm:w-auto"
-                                    :disabled="stooqFetchingStock"
-                                    @click="fetchStockFromStooq"
-                                >
-                                    <Loader2
-                                        v-if="stooqFetchingStock"
-                                        class="size-4 animate-spin"
-                                    />
-                                    <DownloadCloud v-else class="size-4" />
-                                    Fetch from Stooq (daily)
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    class="w-full sm:w-auto"
-                                    :disabled="
-                                        historicalForm.processing ||
-                                        !historicalForm.file
-                                    "
-                                    @click="submitHistoricalImport"
-                                >
-                                    <Loader2
-                                        v-if="historicalForm.processing"
-                                        class="size-4 animate-spin"
-                                    />
-                                    <Upload v-else class="size-4" />
-                                    Upload CSV
-                                </Button>
-                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                class="w-full sm:w-auto"
+                                :disabled="
+                                    historicalForm.processing ||
+                                    !historicalForm.file
+                                "
+                                @click="submitHistoricalImport"
+                            >
+                                <Loader2
+                                    v-if="historicalForm.processing"
+                                    class="size-4 animate-spin"
+                                />
+                                <Upload v-else class="size-4" />
+                                Upload CSV
+                            </Button>
                         </div>
                     </div>
 

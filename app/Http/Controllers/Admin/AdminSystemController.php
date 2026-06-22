@@ -136,7 +136,7 @@ class AdminSystemController extends Controller
                 'finished_at' => $r->finished_at?->toDateTimeString(),
             ]);
 
-        $summary = (new Collection(['nasdaq_list', 'company_profiles', 'stooq_history', 'manual_import', 'bulk_import']))->mapWithKeys(fn (string $type) => [
+        $summary = (new Collection(['nasdaq_list', 'company_profiles', 'manual_import', 'bulk_import']))->mapWithKeys(fn (string $type) => [
             $type => [
                 'last_success' => SyncRun::lastOfStatus($type, SyncRun::STATUS_SUCCESS)?->finished_at?->diffForHumans(),
                 'last_failure' => SyncRun::lastOfStatus($type, SyncRun::STATUS_FAILED)?->finished_at?->diffForHumans(),
