@@ -6,43 +6,30 @@ namespace App\Enums;
 
 enum Market: string
 {
-    case BIST = 'BIST';
     case NASDAQ = 'NASDAQ';
 
     public function label(): string
     {
-        return match ($this) {
-            self::BIST => 'Borsa İstanbul',
-            self::NASDAQ => 'NASDAQ',
-        };
+        return 'NASDAQ';
     }
 
     public function currency(): string
     {
-        return match ($this) {
-            self::BIST => 'TRY',
-            self::NASDAQ => 'USD',
-        };
+        return 'USD';
     }
 
     public function timezone(): string
     {
-        return match ($this) {
-            self::BIST => 'Europe/Istanbul',
-            self::NASDAQ => 'America/New_York',
-        };
+        return 'America/New_York';
     }
 
     /**
      * The TradingView exchange prefix used to build chart/quote widget symbols
-     * (e.g. NASDAQ:AAPL, BIST:THYAO).
+     * (e.g. NASDAQ:AAPL).
      */
     public function tradingViewExchange(): string
     {
-        return match ($this) {
-            self::BIST => 'BIST',
-            self::NASDAQ => 'NASDAQ',
-        };
+        return 'NASDAQ';
     }
 
     /**
@@ -52,27 +39,21 @@ enum Market: string
      */
     public function tradingHours(): array
     {
-        return match ($this) {
-            self::BIST => ['open' => '10:00', 'close' => '18:00'],
-            self::NASDAQ => ['open' => '09:30', 'close' => '16:00'],
-        };
+        return ['open' => '09:30', 'close' => '16:00'];
     }
 
     /**
      * Extended-hours (pre-market / after-hours) windows in the market's own
-     * timezone, or null when the exchange has no extended session (BIST).
+     * timezone.
      *
-     * @return array{pre: array{open: string, close: string}, after: array{open: string, close: string}}|null
+     * @return array{pre: array{open: string, close: string}, after: array{open: string, close: string}}
      */
-    public function extendedHours(): ?array
+    public function extendedHours(): array
     {
-        return match ($this) {
-            self::NASDAQ => [
-                'pre' => ['open' => '04:00', 'close' => '09:30'],
-                'after' => ['open' => '16:00', 'close' => '20:00'],
-            ],
-            self::BIST => null,
-        };
+        return [
+            'pre' => ['open' => '04:00', 'close' => '09:30'],
+            'after' => ['open' => '16:00', 'close' => '20:00'],
+        ];
     }
 
     /**

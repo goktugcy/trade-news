@@ -11,19 +11,23 @@ type Options = {
     intervalMs?: number;
 };
 
-function maxId(items: NewsCardData[]): number {
-    return items.reduce((max, item) => (item.id > max ? item.id : max), 0);
+/**
+ * The id of the top (newest) item on screen. The feed is rendered newest-first
+ * (published_at desc, id desc), so the first element is the cursor anchor — the
+ * server reads its exact timestamp and returns only rows strictly above it.
+ */
+function topId(items: NewsCardData[]): number {
+    return items[0]?.id ?? 0;
 }
 
 /**
- * Twitter-style live feed over polling. New items (id greater than what's on
- * screen) surface as a "+N new" pill the reader taps to prepend them.
+ * Twitter-style live feed over polling. The cursor is the top item's id; the
+ * server resolves its exact (microsecond) timestamp and returns only genuinely
+ * newer rows, so items already shown are never re-offered after a refresh.
+ * `pending` is recomputed each poll as "newer than the anchor, not on screen".
  *
- * The high-water-mark is derived purely from the SSR-rendered feed (its newest
- * id), NOT persisted — the feed always renders newest-first, so the on-screen
- * max IS the correct cursor. (Persisting it broke polling whenever the dev DB
- * was reseeded to lower ids: the stale-high cursor made `id > seen` match
- * nothing while a full refresh still showed the new rows.)
+ * While the reader is at the top, new items stream in automatically; once they
+ * scroll down they buffer behind the "+N new" pill so the list never jumps.
  */
 export function useLiveNewsFeed(opts: Options): {
     items: Ref<NewsCardData[]>;
@@ -34,14 +38,14 @@ export function useLiveNewsFeed(opts: Options): {
     const pending = ref<NewsCardData[]>([]);
     const pendingCount = computed(() => pending.value.length);
 
-    // Cursor: highest id already on screen. Anything above it is "new".
-    let seen = maxId(items.value);
+    // Cursor: id of the newest item on screen. Anything strictly newer is "new".
+    let cursorId = topId(items.value);
 
     // New SSR data (navigation / filter change) resets the visible list + cursor.
     watch(opts.initial, (next) => {
         items.value = [...next];
         pending.value = [];
-        seen = maxId(next);
+        cursorId = topId(next);
     });
 
     function applyUpdates(updates: NewsCardData[]): void {
@@ -60,7 +64,10 @@ export function useLiveNewsFeed(opts: Options): {
 
     async function poll(): Promise<void> {
         try {
-            const params = new URLSearchParams({ scope: opts.scope, after: String(seen) });
+            const params = new URLSearchParams({ scope: opts.scope });
+            if (cursorId > 0) {
+                params.set('after_id', String(cursorId));
+            }
             params.set('ids', items.value.slice(0, 60).map((item) => item.id).join(','));
 
             const filters = opts.filters?.() ?? {};
@@ -86,17 +93,11 @@ export function useLiveNewsFeed(opts: Options): {
                 applyUpdates(json.updates);
             }
 
-            const known = new Set([...items.value, ...pending.value].map((item) => item.id));
-            const fresh = (json.items ?? []).filter((item) => item.id > seen && !known.has(item.id));
+            // The server returns the full "newer than the anchor" set (newest
+            // first); keep only the ones not already on screen as the buffer.
+            const shown = new Set(items.value.map((item) => item.id));
+            pending.value = (json.items ?? []).filter((item) => !shown.has(item.id));
 
-            if (fresh.length) {
-                pending.value = [...fresh, ...pending.value];
-            }
-
-            // While the reader is at the top of the feed, new items stream in
-            // automatically (no pill to dismiss). Once they scroll down, items
-            // buffer behind the "+N new" pill so the list never jumps under them;
-            // scrolling back to the top auto-reveals on the next poll.
             if (pending.value.length > 0 && isAtTop()) {
                 flush();
             }
@@ -116,11 +117,11 @@ export function useLiveNewsFeed(opts: Options): {
             return;
         }
 
-        // Revealed items become the new high-water-mark so they aren't re-offered.
-        seen = Math.max(seen, maxId(pending.value));
-
         items.value = [...pending.value, ...items.value];
         pending.value = [];
+
+        // Advance the cursor to the new top so revealed items aren't re-offered.
+        cursorId = topId(items.value);
     }
 
     return { items, pendingCount, flush };

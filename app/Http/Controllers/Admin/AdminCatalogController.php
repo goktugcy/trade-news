@@ -54,7 +54,6 @@ class AdminCatalogController extends Controller
                 ]),
             'marketOptions' => [
                 ['value' => null, 'label' => 'Global'],
-                ['value' => Market::BIST->value, 'label' => Market::BIST->value],
                 ['value' => Market::NASDAQ->value, 'label' => Market::NASDAQ->value],
             ],
         ]);
@@ -118,7 +117,7 @@ class AdminCatalogController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'feed_url' => ['required', 'url', 'max:1024'],
             'homepage_url' => ['nullable', 'url', 'max:255'],
-            'market' => ['nullable', Rule::in([Market::BIST->value, Market::NASDAQ->value])],
+            'market' => ['nullable', Rule::in([Market::NASDAQ->value])],
             'language' => ['nullable', 'string', 'max:8'],
             'is_active' => ['boolean'],
         ]);

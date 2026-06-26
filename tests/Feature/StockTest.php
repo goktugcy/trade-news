@@ -77,7 +77,7 @@ it('renders the admin market data monitoring page', function () {
 
 it('does not show synthetic prices when the synthetic provider is disabled', function () {
     $user = User::factory()->create();
-    $stock = Stock::factory()->bist()->create(['symbol' => 'AKBNK']);
+    $stock = Stock::factory()->nasdaq()->create(['symbol' => 'AAPL']);
 
     ApiProvider::factory()->create([
         'key' => 'synthetic',
@@ -93,11 +93,11 @@ it('does not show synthetic prices when the synthetic provider is disabled', fun
     ]);
 
     $this->actingAs($user)
-        ->get('/stocks?market=BIST')
+        ->get('/stocks?market=NASDAQ')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('stocks/Index')
-            ->where('stocks.0.symbol', 'AKBNK')
+            ->where('stocks.0.symbol', 'AAPL')
             ->where('stocks.0.price', null));
 });
 

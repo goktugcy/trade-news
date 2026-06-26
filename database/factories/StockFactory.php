@@ -35,15 +35,6 @@ class StockFactory extends Factory
         ];
     }
 
-    public function bist(): static
-    {
-        return $this->state(fn () => [
-            'market' => Market::BIST,
-            'exchange' => 'Borsa İstanbul',
-            'currency' => 'TRY',
-        ]);
-    }
-
     public function nasdaq(): static
     {
         return $this->state(fn () => [

@@ -6,8 +6,10 @@ namespace App\Models;
 
 use App\Enums\Market;
 use App\Enums\StockIndex;
+use App\Observers\StockObserver;
 use App\Services\Providers\ApiProviderRegistry;
 use Database\Factories\StockFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property array<int, string>|null $keywords
  * @property bool $is_active
  */
+#[ObservedBy(StockObserver::class)]
 class Stock extends Model
 {
     /** @use HasFactory<StockFactory> */
@@ -126,6 +129,17 @@ class Stock extends Model
     public function indexMemberships(): HasMany
     {
         return $this->hasMany(StockIndexMembership::class);
+    }
+
+    /**
+     * Normalized alias rows used by the deterministic news matcher (rebuilt by
+     * StockAliasService — not edited directly).
+     *
+     * @return HasMany<StockAlias, $this>
+     */
+    public function aliasEntries(): HasMany
+    {
+        return $this->hasMany(StockAlias::class);
     }
 
     /**

@@ -78,7 +78,6 @@ class NewsController extends Controller
     {
         $scope = $request->string('scope')->toString();
         $scope = in_array($scope, ['all', 'watchlist', 'saved'], true) ? $scope : 'all';
-        $after = $request->integer('after');
         $locale = $request->user()->locale;
 
         $ids = collect(explode(',', $request->string('ids')->toString()))
@@ -87,15 +86,35 @@ class NewsController extends Controller
             ->take(60)
             ->values();
 
+        // Keyset cursor anchored on the top item's id: read its exact timestamp
+        // from the DB (microsecond precision) and return only rows strictly above
+        // it in the feed order (published_at, id). This avoids the serialization
+        // pitfall where a seconds-truncated cursor makes same-second rows look
+        // "new" on every refresh. Already-shown rows are never re-offered.
+        $anchor = ($afterId = $request->integer('after_id')) > 0
+            ? NewsItem::query()->find($afterId)
+            : null;
+
         $stock = $request->string('stock')->upper()->toString();
         $stockFilter = fn (Builder $q): Builder => $q->when(
             $stock !== '',
             fn (Builder $inner) => $inner->whereHas('stocks', fn (Builder $s) => $s->where('symbol', $stock)),
         );
 
-        $newItems = $after > 0
-            ? $stockFilter($this->scopedQuery($request, $scope))->where('id', '>', $after)->limit(20)->get()
-            : collect();
+        $newItems = collect();
+
+        if ($anchor?->published_at !== null) {
+            $anchorTs = $anchor->published_at->format('Y-m-d H:i:s.u');
+
+            $newItems = $stockFilter($this->scopedQuery($request, $scope))
+                ->where(fn (Builder $q) => $q
+                    ->where('published_at', '>', $anchorTs)
+                    ->orWhere(fn (Builder $tie) => $tie
+                        ->where('published_at', $anchorTs)
+                        ->where('id', '>', $anchor->id)))
+                ->limit(20)
+                ->get();
+        }
 
         $updates = $ids->isNotEmpty()
             ? $stockFilter($this->scopedQuery($request, $scope))->whereIn('id', $ids)->get()
@@ -104,7 +123,6 @@ class NewsController extends Controller
         return response()->json([
             'items' => NewsPresenter::collection($newItems, $locale),
             'updates' => NewsPresenter::collection($updates, $locale),
-            'latest_id' => (int) ($newItems->max('id') ?? $after),
         ]);
     }
 
@@ -156,7 +174,7 @@ class NewsController extends Controller
                 fn (Builder $q) => $q->whereNotIn('source_id', $disabled),
             )
             ->when(
-                in_array($market, [Market::BIST->value, Market::NASDAQ->value], true),
+                $market === Market::NASDAQ->value,
                 fn (Builder $q) => $q->where('market', $market),
             )
             ->when(
@@ -170,12 +188,12 @@ class NewsController extends Controller
                         ->orWhereHas('stocks', fn (Builder $s) => $s->where('symbol', 'ILIKE', "%{$search}%"));
                 });
             })
-            // Order by id (ingestion order), not published_at: the live "+N new"
-            // pill tracks a monotonic id high-water-mark, so the displayed feed
-            // must agree with it. Ordering by published_at let late-ingested but
-            // older articles (higher id, older timestamp) sit forever above the
-            // page-1 id ceiling, making the pill show phantom/stuck counts.
-            ->reorder('id', 'desc');
+        // Newest-published first. The live feed's cursor is published_at
+        // based (see live()), so the SSR feed and the poll agree: items
+        // already shown are never re-offered after a refresh, and genuinely
+        // newer articles surface at the top.
+            ->reorder('published_at', 'desc')
+            ->orderByDesc('id');
     }
 
     /**
@@ -257,12 +275,14 @@ class NewsController extends Controller
             return '';
         }
 
-        if (in_array($requested, [Market::BIST->value, Market::NASDAQ->value], true)) {
+        if ($requested === Market::NASDAQ->value) {
             return $requested;
         }
 
         $preferredMarkets = $request->user()->dataPreference?->preferred_markets ?? [];
 
-        return count($preferredMarkets) === 1 ? (string) $preferredMarkets[0] : '';
+        return count($preferredMarkets) === 1 && $preferredMarkets[0] === Market::NASDAQ->value
+            ? Market::NASDAQ->value
+            : '';
     }
 }

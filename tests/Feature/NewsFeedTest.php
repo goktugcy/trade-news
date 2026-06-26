@@ -23,12 +23,12 @@ it('renders the all-news feed with matched items', function () {
 
 it('filters the feed by market', function () {
     $user = User::factory()->create();
-    NewsItem::factory()->count(2)->create(['is_matched' => true, 'market' => Market::BIST]);
+    NewsItem::factory()->count(2)->create(['is_matched' => true, 'market' => null]);
     NewsItem::factory()->count(3)->create(['is_matched' => true, 'market' => Market::NASDAQ]);
 
     $this->actingAs($user)
-        ->get('/news?market=BIST')
-        ->assertInertia(fn (Assert $page) => $page->has('news.data', 2));
+        ->get('/news?market=NASDAQ')
+        ->assertInertia(fn (Assert $page) => $page->has('news.data', 3));
 });
 
 it('excludes unmatched news from the feed', function () {

@@ -1,7 +1,7 @@
 # TradeNews
 
 A SaaS-style **market news & stock tracking** platform, built as a clean **modular Laravel monolith**.
-Track BIST & NASDAQ stocks, view current/historical prices with charts, follow market and
+Track NASDAQ stocks, view current/historical prices with charts, follow market and
 company-specific news, build watchlists, and receive **Telegram alerts** on your chosen schedule.
 
 The interface is a modern financial terminal crossed with a clean social feed: left sidebar
@@ -21,7 +21,7 @@ light/dark mode.
 | Frontend | Inertia.js + Vue 3 + TypeScript |
 | Styling | Tailwind CSS v4 (shadcn-vue / reka-ui components) |
 | Charts | [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts) |
-| News feeds | RSS/Atom via `laminas/laminas-feed` (9 sources) + Finnhub + KAP |
+| News feeds | RSS/Atom via `laminas/laminas-feed` (5 sources) + Finnhub |
 | AI summaries | OpenAI (optional, via Laravel's HTTP client — no SDK; graceful no-key fallback) |
 | Auth | Laravel Fortify (incl. 2FA + passkeys from the starter kit) |
 | Notifications | Telegram Bot API (via Laravel's HTTP client — no extra SDK) |
@@ -80,7 +80,6 @@ Services/
     NewsProviderInterface.php           # contract: fetchLatest()
     SyntheticNewsProvider.php           # default — generates matchable headlines
     FinnhubNewsProvider.php             # real example integration
-    KapNewsProvider.php                 # best-effort KAP (BIST disclosures)
     NewsIngestor.php                    # dedupe (hash) → store
     NewsMatcherService.php              # match news → stocks (symbol/name/alias/keyword)
     SentimentAnalyzer.php               # lexicon sentiment + importance scoring
@@ -131,7 +130,7 @@ php artisan key:generate
 # 3. Create the database (defaults assume a local 'tradenews' DB)
 createdb tradenews            # or: psql -c "CREATE DATABASE tradenews;"
 
-# 4. Migrate + seed demo data (BIST/NASDAQ stocks, prices, matched news, demo users)
+# 4. Migrate + seed demo data (NASDAQ stocks, prices, matched news, demo users)
 php artisan migrate --seed
 
 # 5. Build the frontend
@@ -161,7 +160,7 @@ npm run dev
 | Admin | `admin@tradenews.test` | `password` |
 | User | `demo@tradenews.test` | `password` |
 
-The demo user comes with a 5-stock watchlist and a 15-minute alert rule (Telegram starts
+The demo user comes with a 4-stock watchlist and a 15-minute alert rule (Telegram starts
 unconnected so you can walk through the connect flow).
 
 ---
@@ -174,7 +173,7 @@ DB_DATABASE=tradenews
 
 # Providers: "synthetic" runs with no keys. Switch to a real driver once you add a key.
 MARKET_DATA_PROVIDER=synthetic       # synthetic | finnhub | twelvedata
-NEWS_PROVIDER=synthetic              # synthetic | finnhub | kap
+NEWS_PROVIDER=synthetic              # synthetic | finnhub
 FINNHUB_KEY=
 TWELVEDATA_KEY=
 
@@ -195,9 +194,9 @@ in the `api_providers` table (admin panel).
 
 ### RSS aggregation, timezones & AI summaries
 
-- **RSS news aggregation** — `RssNewsProvider` (built on `laminas/laminas-feed`) pulls 9 sources
-  (Reuters, MarketWatch, Yahoo Finance, CNBC, Investing.com, KAP, Bloomberg HT, Foreks, Investing
-  Türkiye), configured under `tradenews.news.providers.rss.feeds`. Each feed is its own
+- **RSS news aggregation** — `RssNewsProvider` (built on `laminas/laminas-feed`) pulls 5 sources
+  (Reuters, MarketWatch, Yahoo Finance, CNBC and Investing.com), configured under
+  `tradenews.news.providers.rss.feeds`. Each feed is its own
   `news_sources` row. `tradenews:fetch-news` fans out one queued job **per active provider**, so
   all sources contribute (not just the first).
 - **Cross-source merge** — the same story from multiple outlets collapses into one article

@@ -38,21 +38,18 @@ beforeEach(function (): void {
 it('reports prunable NASDAQ rows without deleting them in dry run mode', function () {
     $kept = Stock::factory()->nasdaq()->create(['symbol' => 'AAPL']);
     $outside = Stock::factory()->nasdaq()->create(['symbol' => 'ZZZZ']);
-    $bist = Stock::factory()->bist()->create(['symbol' => 'ZZZZ']);
 
     $this->artisan('tradenews:prune-nasdaq-universe --dry-run --source=fallback')
         ->assertSuccessful();
 
     expect(Stock::query()->whereKey($kept->id)->exists())->toBeTrue()
-        ->and(Stock::query()->whereKey($outside->id)->exists())->toBeTrue()
-        ->and(Stock::query()->whereKey($bist->id)->exists())->toBeTrue();
+        ->and(Stock::query()->whereKey($outside->id)->exists())->toBeTrue();
 });
 
 it('deletes only NASDAQ rows outside the configured index universe and cascades related data', function () {
     $kept = Stock::factory()->nasdaq()->create(['symbol' => 'MSFT']);
     $shareClass = Stock::factory()->nasdaq()->create(['symbol' => 'BRK.B']);
     $outside = Stock::factory()->nasdaq()->create(['symbol' => 'ZZZZ']);
-    $bist = Stock::factory()->bist()->create(['symbol' => 'ZZZZ']);
     $user = User::factory()->create();
     $news = NewsItem::factory()->create();
 
@@ -79,7 +76,6 @@ it('deletes only NASDAQ rows outside the configured index universe and cascades 
 
     expect(Stock::query()->whereKey($kept->id)->exists())->toBeTrue()
         ->and(Stock::query()->whereKey($shareClass->id)->exists())->toBeTrue()
-        ->and(Stock::query()->whereKey($bist->id)->exists())->toBeTrue()
         ->and(Stock::query()->whereKey($outside->id)->exists())->toBeFalse()
         ->and(StockPrice::query()->where('stock_id', $outside->id)->exists())->toBeFalse()
         ->and(NewsStockMatch::query()->where('stock_id', $outside->id)->exists())->toBeFalse()

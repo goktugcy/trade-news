@@ -13,7 +13,7 @@ use Illuminate\Console\Command;
 
 class FetchLatestNewsCommand extends Command
 {
-    protected $signature = 'tradenews:fetch-news {--market= : Limit to BIST or NASDAQ}';
+    protected $signature = 'tradenews:fetch-news {--market= : Limit to NASDAQ}';
 
     protected $description = 'Dispatch news-fetch jobs (per market) via the configured news provider';
 

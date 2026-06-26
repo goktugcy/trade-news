@@ -3,7 +3,11 @@
     "allow": [
       "Bash(php -l app/Http/Controllers/NewsController.php)",
       "Bash(php -l app/Http/Controllers/StockController.php)",
-      "Bash(grep -n 'Timeframe::OneDay\\\\|in_array\\($range' app/Http/Controllers/StockController.php)"
+      "Bash(grep -n 'Timeframe::OneDay\\\\|in_array\\($range' app/Http/Controllers/StockController.php)",
+      "Bash(cd \"/Users/goktugceyhan/Desktop/My Projects/trade-news\" && echo \"=== aliases usage across app ===\"; grep -rln \"->aliases\\\\|'aliases'\\\\|aliases =>\" app/ database/ | head; echo \"=== news_stock_matches migration ===\"; sed -n '1,40p' database/migrations/*news_stock_matches*; echo \"=== MatchNewsCommand ===\"; sed -n '1,60p' app/Console/Commands/MatchNewsCommand.php)"
+    ],
+    "additionalDirectories": [
+      "/Users/goktugceyhan/Desktop/My Projects/trade-news/database/migrations"
     ]
   }
 }

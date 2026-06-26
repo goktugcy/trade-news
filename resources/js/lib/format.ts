@@ -1,10 +1,12 @@
 const currencySymbols: Record<string, string> = {
     USD: '$',
-    TRY: '₺',
     EUR: '€',
 };
 
-export function formatPrice(value: number | null | undefined, currency = 'USD'): string {
+export function formatPrice(
+    value: number | null | undefined,
+    currency = 'USD',
+): string {
     if (value === null || value === undefined) {
         return '—';
     }
@@ -43,7 +45,10 @@ export function formatNumber(value: number | null | undefined): string {
         return '—';
     }
 
-    return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+    return new Intl.NumberFormat('en-US', {
+        notation: 'compact',
+        maximumFractionDigits: 1,
+    }).format(value);
 }
 
 export function changeClass(value: number | null | undefined): string {

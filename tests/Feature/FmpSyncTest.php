@@ -7,7 +7,6 @@ use App\Enums\ProviderType;
 use App\Jobs\FetchStockPricesJob;
 use App\Models\ApiProvider;
 use App\Models\Stock;
-use App\Models\StockPrice;
 use App\Models\SyncRun;
 use App\Models\SystemJob;
 use App\Models\User;
@@ -325,121 +324,10 @@ it('uses the configured FMP key for generic market auto-sync when the provider r
     expect(Stock::query()->where('market', Market::NASDAQ->value)->where('symbol', 'AAPL')->exists())->toBeTrue();
 });
 
-it('syncs BIST100 stocks and quote prices through RapidAPI auto-sync', function () {
-    ApiProvider::factory()->create([
-        'key' => 'rapidapi-bist100',
-        'name' => 'RapidAPI BIST100',
-        'type' => ProviderType::MarketData,
-        'base_url' => 'https://bist100-stock-data-15-minutes-late-live.p.rapidapi.com',
-        'api_key' => 'rapid-key',
-        'is_active' => true,
-        'auto_sync_stocks' => true,
-        'markets' => ['BIST'],
-        'capabilities' => ['list', 'quotes'],
-        'refresh_interval_minutes' => 1,
-    ]);
-
-    Http::preventStrayRequests();
-    Http::fake([
-        'bist100-stock-data-15-minutes-late-live.p.rapidapi.com/bist100/prices' => Http::response([
-            [
-                'code' => 'AKBNK',
-                'open' => 78.3,
-                'close' => 81.15,
-                'high' => 81.5,
-                'low' => 78.1,
-                'last' => 81.15,
-                'daily_change_price' => 3.15,
-                'daily_change_percent' => 4.04,
-                'volume_turkish_lira' => 10900403136.45,
-                'volume_lot' => 135821755,
-                'volatility' => 4.36,
-                'last_update' => '18.06.2026 18:14:42',
-            ],
-        ], 200),
-    ]);
-
-    $this->artisan('tradenews:sync-market-stocks')->assertSuccessful();
-
-    Http::assertSent(fn (Request $request): bool => str_contains($request->url(), '/bist100/prices')
-        && $request->hasHeader('x-rapidapi-key', 'rapid-key'));
-
-    $stock = Stock::query()->where('market', Market::BIST->value)->where('symbol', 'AKBNK')->firstOrFail();
-    $price = StockPrice::query()
-        ->where('stock_id', $stock->id)
-        ->where('provider_key', 'rapidapi-bist100')
-        ->where('timeframe', '1d')
-        ->firstOrFail();
-
-    expect($stock->currency)->toBe('TRY')
-        ->and((float) $price->open)->toBe(78.3)
-        ->and((float) $price->high)->toBe(81.5)
-        ->and((float) $price->low)->toBe(78.1)
-        ->and((float) $price->close)->toBe(81.15)
-        ->and((float) $price->volume)->toBe(135821755.0)
-        ->and($price->price_at->format('Y-m-d H:i'))->toBe('2026-06-18 00:00')
-        ->and($price->source_kind)->toBe(StockPrice::SOURCE_QUOTE);
-});
-
-it('runs RapidAPI BIST100 sync for an aliased provider key even when FMP is skipped', function () {
-    seedFmpProvider([
-        'api_key' => null,
-        'auto_sync_stocks' => true,
-        'refresh_interval_minutes' => 1,
-    ]);
-
-    ApiProvider::factory()->create([
-        'key' => 'rapid',
-        'name' => 'RapidAPI',
-        'type' => ProviderType::MarketData,
-        'base_url' => 'https://bist100-stock-data-15-minutes-late-live.p.rapidapi.com/bist100/prices',
-        'api_key' => 'rapid-key',
-        'is_active' => true,
-        'auto_sync_stocks' => true,
-        'markets' => ['BIST'],
-        'capabilities' => ['list', 'profiles'],
-        'refresh_interval_minutes' => 20,
-    ]);
-
-    Http::preventStrayRequests();
-    Http::fake([
-        'bist100-stock-data-15-minutes-late-live.p.rapidapi.com/bist100/prices' => Http::response([
-            [
-                'code' => 'AKBNK',
-                'open' => 78.3,
-                'close' => 81.15,
-                'high' => 81.5,
-                'low' => 78.1,
-                'last' => 81.15,
-                'daily_change_price' => 3.15,
-                'volume_lot' => 135821755,
-                'last_update' => '18.06.2026 18:14:42',
-            ],
-        ], 200),
-    ]);
-
-    $this->artisan('tradenews:sync-market-stocks --force')->assertSuccessful();
-
-    Http::assertSentCount(1);
-    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/bist100/prices')
-        && ! str_contains($request->url(), '/bist100/prices/bist100/prices'));
-
-    $job = SystemJob::query()->where('name', 'tradenews:sync-market-stocks')->latest('id')->first();
-    $run = SyncRun::query()->where('type', 'bist100_quotes')->latest('id')->first();
-    $stock = Stock::query()->where('market', Market::BIST->value)->where('symbol', 'AKBNK')->firstOrFail();
-    $price = StockPrice::query()->where('stock_id', $stock->id)->where('provider_key', 'rapidapi-bist100')->firstOrFail();
-
-    expect((float) $price->close)->toBe(81.15)
-        ->and($run?->provider_key)->toBe('rapid')
-        ->and($job?->meta['provider_keys'] ?? null)->toBe(['rapid'])
-        ->and($job?->meta['skipped'][0]['provider_key'] ?? null)->toBe('fmp')
-        ->and($job?->meta['skipped'][0]['reason'] ?? null)->toBe('missing_api_key');
-});
-
-it('does not run NASDAQ sync when FMP is scoped to BIST', function () {
+it('does not run NASDAQ sync when FMP is scoped to an unsupported market', function () {
     seedFmpProvider([
         'auto_sync_stocks' => true,
-        'markets' => ['BIST'],
+        'markets' => ['NYSE'],
         'capabilities' => ['list'],
     ]);
 

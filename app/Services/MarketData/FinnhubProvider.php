@@ -6,7 +6,6 @@ namespace App\Services\MarketData;
 
 use App\DataTransferObjects\CandleData;
 use App\DataTransferObjects\QuoteData;
-use App\Enums\Market;
 use App\Enums\Timeframe;
 use App\Models\Stock;
 use Carbon\CarbonImmutable;
@@ -42,7 +41,7 @@ class FinnhubProvider implements MarketDataProviderInterface
     {
         try {
             $response = $this->client(8)->get('/quote', [
-                'symbol' => $this->vendorSymbol($stock),
+                'symbol' => $stock->symbol,
                 'token' => $this->apiKey,
             ]);
         } catch (ConnectionException $exception) {
@@ -94,7 +93,7 @@ class FinnhubProvider implements MarketDataProviderInterface
 
         try {
             $response = $this->client(10)->get('/stock/candle', [
-                'symbol' => $this->vendorSymbol($stock),
+                'symbol' => $stock->symbol,
                 'resolution' => $resolution,
                 'from' => $from->getTimestamp(),
                 'to' => $to->getTimestamp(),
@@ -143,16 +142,6 @@ class FinnhubProvider implements MarketDataProviderInterface
         }
 
         return $candles;
-    }
-
-    /**
-     * Finnhub expects an exchange suffix for non-US markets (BIST → ".IS").
-     */
-    private function vendorSymbol(Stock $stock): string
-    {
-        return $stock->market === Market::BIST
-            ? "{$stock->symbol}.IS"
-            : $stock->symbol;
     }
 
     private function resolution(Timeframe $timeframe): string

@@ -23,10 +23,9 @@ function tvSymbol(): string {
         return props.tradingviewSymbol;
     }
 
-    const exchange = props.market === 'BIST' ? 'BIST' : 'NASDAQ';
     const clean = props.symbol.toUpperCase().replace(/[^A-Z0-9.]/g, '');
 
-    return `${exchange}:${clean}`;
+    return `NASDAQ:${clean}`;
 }
 
 function render(): void {
@@ -76,7 +75,13 @@ function render(): void {
 onMounted(render);
 
 watch(
-    () => [props.symbol, props.market, props.tradingviewSymbol, resolvedAppearance.value, locale.value],
+    () => [
+        props.symbol,
+        props.market,
+        props.tradingviewSymbol,
+        resolvedAppearance.value,
+        locale.value,
+    ],
     render,
 );
 

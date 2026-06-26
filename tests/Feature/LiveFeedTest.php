@@ -6,20 +6,21 @@ use App\Models\NewsItem;
 use App\Models\Stock;
 use App\Models\User;
 
-it('returns only news newer than the after cursor for the live feed', function () {
+it('returns only news published after the cursor for the live feed', function () {
     $user = User::factory()->create();
-    $older = NewsItem::factory()->create(['is_matched' => true]);
-    $newer = NewsItem::factory()->create(['is_matched' => true]);
+    $older = NewsItem::factory()->create(['is_matched' => true, 'published_at' => now()->subHour()]);
+    $newer = NewsItem::factory()->create(['is_matched' => true, 'published_at' => now()]);
 
+    // Cursor anchored on the older item (the top of the feed); only items
+    // strictly above it — the genuinely newer article — come back.
     $response = $this->actingAs($user)
-        ->getJson('/news/live?scope=all&after='.$older->id)
+        ->getJson('/news/live?scope=all&after_id='.$older->id)
         ->assertOk();
 
     $ids = collect($response->json('items'))->pluck('id');
 
     expect($ids)->toContain($newer->id)
-        ->and($ids)->not->toContain($older->id)
-        ->and($response->json('latest_id'))->toBe($newer->id);
+        ->and($ids)->not->toContain($older->id);
 });
 
 it('returns in-place updates for the provided visible ids', function () {

@@ -11,7 +11,6 @@ use App\Services\MarketData\MarketDataProviderInterface;
 use App\Services\MarketData\SyntheticMarketDataProvider;
 use App\Services\MarketData\TwelveDataProvider;
 use App\Services\News\FinnhubNewsProvider;
-use App\Services\News\KapNewsProvider;
 use App\Services\News\NewsProviderInterface;
 use App\Services\News\RssNewsProvider;
 use App\Services\News\SyntheticNewsProvider;
@@ -258,11 +257,7 @@ class ApiProviderRegistry
         }
 
         return match ($type) {
-            ProviderType::MarketData => match ($provider->key) {
-                'rapidapi-bist100' => $this->providerApiKey($provider) !== null
-                    && $this->providerHasAnyCapability($provider, ['quotes', 'list']),
-                default => $this->makeMarketDataProvider($provider) !== null,
-            },
+            ProviderType::MarketData => $this->makeMarketDataProvider($provider) !== null,
             ProviderType::News => $this->makeNewsProvider($provider) !== null,
         };
     }
@@ -282,8 +277,7 @@ class ApiProviderRegistry
         return match ($provider->key) {
             'finnhub', 'twelvedata', self::SYNTHETIC_MARKET_KEY => self::MARKET_DATA_FETCH_CAPABILITIES,
             'fmp' => ['list', 'profiles', 'index_constituents'],
-            'rapidapi-bist100' => ['list', 'quotes'],
-            'finnhub-news', 'kap', 'rss', self::SYNTHETIC_NEWS_KEY => ['news'],
+            'finnhub-news', 'rss', self::SYNTHETIC_NEWS_KEY => ['news'],
             default => [],
         };
     }
@@ -311,9 +305,6 @@ class ApiProviderRegistry
             'finnhub-news' => $this->providerApiKey($provider) === null ? null : new FinnhubNewsProvider(
                 $this->providerApiKey($provider),
                 $provider->base_url ?: (string) config('tradenews.news.providers.finnhub.base_url'),
-            ),
-            'kap' => new KapNewsProvider(
-                $provider->base_url ?: (string) config('tradenews.news.providers.kap.base_url', 'https://www.kap.org.tr'),
             ),
             'rss' => new RssNewsProvider(
                 timeout: (int) config('tradenews.news.providers.rss.timeout', 12),

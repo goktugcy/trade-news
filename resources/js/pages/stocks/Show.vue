@@ -14,7 +14,7 @@ import { useLiveQuotes } from '@/composables/useLiveQuotes';
 import { useUserTimezone } from '@/composables/useUserTimezone';
 import { formatNumber, formatPrice } from '@/lib/format';
 import { postJson } from '@/lib/http';
-import type { NewsCardData, StockRow } from '@/types';
+import type { MarketSessionValue, NewsCardData, StockRow } from '@/types';
 
 type AlertTypeOption = { value: string; label: string; needs_threshold: boolean; unit: string | null };
 type StockAlertItem = {
@@ -29,6 +29,7 @@ type StockAlertItem = {
     last_triggered_at: string | null;
 };
 type MarketStatus = {
+    session: MarketSessionValue;
     session_label: string;
     session_color: string;
     is_open: boolean;
@@ -85,8 +86,25 @@ const props = defineProps<{
     recentActivity: ActivityItem[];
 }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const { relative } = useUserTimezone();
+
+// Alert type labels/units are locale-aware on the frontend, keyed by the enum value.
+function alertTypeLabel(value: string): string {
+    const key = `stocks.alertType.${value}`;
+    return te(key) ? t(key) : value;
+}
+
+function alertUnitLabel(value: string | undefined): string {
+    const key = `stocks.alertUnit.${value}`;
+    return value && te(key) ? t(key) : t('stocks.threshold');
+}
+
+// Market session label is locale-aware on the frontend, keyed by the enum value.
+function sessionLabel(session: MarketSessionValue): string {
+    const key = `marketSession.${session}`;
+    return te(key) ? t(key) : props.marketStatus.session_label;
+}
 
 const signalClasses: Record<string, string> = {
     emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
@@ -233,7 +251,7 @@ function toggleAlert() {
 
                 <div class="flex items-center gap-1.5 text-xs">
                     <span class="rounded-full px-2 py-0.5 font-medium" :class="signalClasses[marketStatus.session_color] ?? signalClasses.slate">
-                        {{ marketStatus.session_label }}
+                        {{ sessionLabel(marketStatus.session) }}
                     </span>
                     <span v-if="marketStatus.is_open && marketStatus.closes_at" class="text-muted-foreground">{{ t('stocks.closesAt') }} {{ marketStatus.closes_at }}</span>
                     <span v-else-if="marketStatus.opens_at" class="text-muted-foreground">{{ t('stocks.opensAt') }} {{ marketStatus.opens_at }}</span>
@@ -358,11 +376,11 @@ function toggleAlert() {
                             v-model="alertForm.type"
                             class="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                         >
-                            <option v-for="a in alertTypes" :key="a.value" :value="a.value">{{ a.label }}</option>
+                            <option v-for="a in alertTypes" :key="a.value" :value="a.value">{{ alertTypeLabel(a.value) }}</option>
                         </select>
                     </div>
                     <div v-if="selectedAlertType?.needs_threshold" class="w-28 space-y-1">
-                        <label class="text-xs text-muted-foreground">{{ selectedAlertType?.unit ?? t('stocks.threshold') }}</label>
+                        <label class="text-xs text-muted-foreground">{{ alertUnitLabel(selectedAlertType?.value) }}</label>
                         <input
                             v-model.number="alertForm.threshold"
                             type="number"
@@ -384,7 +402,7 @@ function toggleAlert() {
                 <div v-if="stockAlerts.length" class="mt-3 flex flex-col divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
                     <div v-for="alert in stockAlerts" :key="alert.id" class="flex items-center justify-between gap-2 py-2 text-sm">
                         <div class="min-w-0">
-                            <span class="font-medium text-foreground">{{ alert.type_label }}</span>
+                            <span class="font-medium text-foreground">{{ alertTypeLabel(alert.type) }}</span>
                             <span v-if="alert.threshold !== null" class="tabular-nums text-muted-foreground"> · {{ alert.threshold }}</span>
                             <span v-if="alert.last_triggered_at" class="block text-xs text-muted-foreground">{{ t('stocks.lastTriggered') }} {{ relative(alert.last_triggered_at) }}</span>
                         </div>

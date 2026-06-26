@@ -184,7 +184,7 @@ class AdminSystemController extends Controller
             ])
             ->all();
 
-        $freshness = (new Collection(['nasdaq_list', 'company_profiles', 'bist100_quotes']))
+        $freshness = (new Collection(['nasdaq_list', 'company_profiles']))
             ->map(function (string $type): array {
                 $last = SyncRun::query()->where('type', $type)->latest('id')->first();
 

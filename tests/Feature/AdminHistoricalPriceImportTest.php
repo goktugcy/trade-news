@@ -113,14 +113,14 @@ it('creates missing stocks and imports Stooq daily rows by ticker suffix', funct
         ->and($price->price_at->toDateTimeString())->toBe('2019-02-07 00:00:00');
 });
 
-it('imports generic bulk CSV rows for multiple stocks and markets', function () {
+it('imports generic bulk CSV rows for multiple stocks', function () {
     $admin = User::factory()->admin()->create();
     Stock::factory()->nasdaq()->create(['symbol' => 'AAPL', 'name' => 'Apple Inc.']);
 
     $file = uploadFile('bulk.csv', implode("\n", [
         'symbol,market,timeframe,datetime,open,high,low,close,volume,name',
         'AAPL,NASDAQ,1d,2026-06-18,190,195,188,194,1200000,Apple Inc.',
-        'AKBNK,BIST,1d,2026-06-18,78.3,81.5,78.1,81.15,135821755,Akbank',
+        'NVDA,NASDAQ,1d,2026-06-18,170,175,168,174,135821755,NVIDIA',
         'MSFT.US,,5m,2026-06-18 09:30:00,420,425,419,424,500000,Microsoft',
     ]));
 
@@ -133,11 +133,11 @@ it('imports generic bulk CSV rows for multiple stocks and markets', function () 
         ->assertSessionHas(SessionKey::FLASH_DATA.'.stock_import.imported', 3)
         ->assertSessionHas(SessionKey::FLASH_DATA.'.stock_import.stocks_created', 2);
 
-    $akbnk = Stock::query()->where('market', Market::BIST->value)->where('symbol', 'AKBNK')->firstOrFail();
+    $nvda = Stock::query()->where('market', Market::NASDAQ->value)->where('symbol', 'NVDA')->firstOrFail();
     $msft = Stock::query()->where('market', Market::NASDAQ->value)->where('symbol', 'MSFT')->firstOrFail();
 
     expect(StockPrice::query()->where('provider_key', StockPrice::PROVIDER_BULK_CSV)->count())->toBe(3)
-        ->and(StockPrice::query()->where('stock_id', $akbnk->id)->where('close', 81.15)->exists())->toBeTrue()
+        ->and(StockPrice::query()->where('stock_id', $nvda->id)->where('close', 174)->exists())->toBeTrue()
         ->and(StockPrice::query()->where('stock_id', $msft->id)->where('timeframe', Timeframe::FiveMinutes->value)->exists())->toBeTrue();
 });
 
@@ -148,9 +148,9 @@ it('imports multiple bulk files in one request', function () {
         'symbol,market,timeframe,datetime,open,high,low,close,volume,name',
         'AAPL,NASDAQ,1d,2026-06-18,190,195,188,194,1200000,Apple Inc.',
     ]));
-    $stooq = uploadFile('stooq-akbnk.txt', implode("\n", [
+    $stooq = uploadFile('stooq-msft.txt', implode("\n", [
         '<TICKER>,<PER>,<DATE>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>,<OPENINT>',
-        'AKBNK.IS,D,20260618,000000,78.3,81.5,78.1,81.15,135821755,0',
+        'MSFT.US,D,20260618,000000,420,425,419,424,500000,0',
     ]));
 
     $this->actingAs($admin)
@@ -164,7 +164,7 @@ it('imports multiple bulk files in one request', function () {
         ->assertSessionHas(SessionKey::FLASH_DATA.'.stock_import.stocks_created', 2);
 
     expect(Stock::query()->where('market', Market::NASDAQ->value)->where('symbol', 'AAPL')->exists())->toBeTrue()
-        ->and(Stock::query()->where('market', Market::BIST->value)->where('symbol', 'AKBNK')->exists())->toBeTrue()
+        ->and(Stock::query()->where('market', Market::NASDAQ->value)->where('symbol', 'MSFT')->exists())->toBeTrue()
         ->and(StockPrice::query()->where('provider_key', StockPrice::PROVIDER_BULK_CSV)->count())->toBe(1)
         ->and(StockPrice::query()->where('provider_key', StockPrice::PROVIDER_STOOQ_UPLOAD)->count())->toBe(1);
 });

@@ -21,7 +21,7 @@ it('shows onboarding props on the dashboard until preferences are completed', fu
             ->where('onboarding.should_show', true)
             ->where('locale', 'en')
             ->has('onboardingOptions.sources', 1)
-            ->has('onboardingOptions.markets', 2));
+            ->has('onboardingOptions.markets', 1));
 });
 
 it('saves locale markets and source preferences from onboarding', function () {
@@ -32,7 +32,7 @@ it('saves locale markets and source preferences from onboarding', function () {
     $this->actingAs($user)
         ->put(route('onboarding.preferences.update'), [
             'locale' => 'tr',
-            'preferred_markets' => [Market::BIST->value],
+            'preferred_markets' => [Market::NASDAQ->value],
             'news_sources' => [
                 ['id' => $enabledSource->id, 'enabled' => true],
                 ['id' => $disabledSource->id, 'enabled' => false],
@@ -46,7 +46,7 @@ it('saves locale markets and source preferences from onboarding', function () {
 
     expect($user->locale)->toBe('tr')
         ->and($preference)->toBeInstanceOf(UserDataPreference::class)
-        ->and($preference->preferred_markets)->toBe([Market::BIST->value])
+        ->and($preference->preferred_markets)->toBe([Market::NASDAQ->value])
         ->and($preference->onboarding_completed_at)->not->toBeNull()
         ->and($user->disabledNewsSources()->pluck('news_source_id')->all())->toBe([$disabledSource->id]);
 

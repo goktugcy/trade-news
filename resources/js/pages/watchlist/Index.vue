@@ -16,7 +16,12 @@ defineOptions({
     layout: { breadcrumbs: [{ title: 'Watchlist', href: '/watchlist' }] },
 });
 
-type SearchResult = { id: number; symbol: string; name: string; market: 'BIST' | 'NASDAQ' };
+type SearchResult = {
+    id: number;
+    symbol: string;
+    name: string;
+    market: 'NASDAQ';
+};
 
 const query = ref('');
 const results = ref<SearchResult[]>([]);
@@ -26,16 +31,22 @@ const { t } = useI18n();
 let debounce: ReturnType<typeof setTimeout> | undefined;
 watch(query, (value) => {
     clearTimeout(debounce);
+
     if (!value) {
         results.value = [];
         open.value = false;
+
         return;
     }
+
     debounce = setTimeout(async () => {
-        const res = await fetch(`/stocks/search?q=${encodeURIComponent(value)}`, {
-            headers: { Accept: 'application/json' },
-            credentials: 'same-origin',
-        });
+        const res = await fetch(
+            `/stocks/search?q=${encodeURIComponent(value)}`,
+            {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            },
+        );
         const json = await res.json();
         results.value = json.results ?? [];
         open.value = true;
@@ -43,25 +54,35 @@ watch(query, (value) => {
 });
 
 function add(stockId: number) {
-    router.post('/watchlist', { stock_id: stockId }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            query.value = '';
-            results.value = [];
-            open.value = false;
+    router.post(
+        '/watchlist',
+        { stock_id: stockId },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                query.value = '';
+                results.value = [];
+                open.value = false;
+            },
         },
-    });
+    );
 }
 
 function remove(item: StockRow) {
     if (item.watchlist_id) {
-        router.delete(`/watchlist/${item.watchlist_id}`, { preserveScroll: true });
+        router.delete(`/watchlist/${item.watchlist_id}`, {
+            preserveScroll: true,
+        });
     }
 }
 
 function toggleAlert(item: StockRow) {
     if (item.watchlist_id) {
-        router.patch(`/watchlist/${item.watchlist_id}/alert`, {}, { preserveScroll: true });
+        router.patch(
+            `/watchlist/${item.watchlist_id}/alert`,
+            {},
+            { preserveScroll: true },
+        );
     }
 }
 </script>
@@ -70,13 +91,22 @@ function toggleAlert(item: StockRow) {
     <Head :title="t('watchlist.title')" />
 
     <div class="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 p-4">
-        <h1 class="text-lg font-semibold text-foreground">{{ t('watchlist.manage') }}</h1>
+        <h1 class="text-lg font-semibold text-foreground">
+            {{ t('watchlist.manage') }}
+        </h1>
 
         <!-- Add box -->
         <div class="relative">
             <div class="relative">
-                <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input v-model="query" :placeholder="t('watchlist.searchPlaceholder')" class="pl-9" @focus="open = results.length > 0" />
+                <Search
+                    class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                    v-model="query"
+                    :placeholder="t('watchlist.searchPlaceholder')"
+                    class="pl-9"
+                    @focus="open = results.length > 0"
+                />
             </div>
             <ul
                 v-if="open && results.length > 0"
@@ -89,9 +119,13 @@ function toggleAlert(item: StockRow) {
                         @click="add(r.id)"
                     >
                         <span class="flex items-center gap-2">
-                            <span class="font-semibold text-foreground">{{ r.symbol }}</span>
+                            <span class="font-semibold text-foreground">{{
+                                r.symbol
+                            }}</span>
                             <MarketBadge :market="r.market" />
-                            <span class="text-muted-foreground">{{ r.name }}</span>
+                            <span class="text-muted-foreground">{{
+                                r.name
+                            }}</span>
                         </span>
                         <Plus class="size-4 text-muted-foreground" />
                     </button>
@@ -104,33 +138,73 @@ function toggleAlert(item: StockRow) {
             :title="t('watchlist.empty')"
             :description="t('watchlist.emptyDescription')"
         >
-            <Link href="/stocks" class="text-sm font-medium text-foreground hover:underline">{{ t('watchlist.browseStocks') }} →</Link>
+            <Link
+                href="/stocks"
+                class="text-sm font-medium text-foreground hover:underline"
+                >{{ t('watchlist.browseStocks') }} →</Link
+            >
         </EmptyState>
 
-        <div v-else class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
-            <ul class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
-                <li v-for="item in items" :key="item.id" class="flex items-center gap-3 px-4 py-3">
-                    <Link :href="`/stocks/${item.symbol}`" class="min-w-0 flex-1">
+        <div
+            v-else
+            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+        >
+            <ul
+                class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border"
+            >
+                <li
+                    v-for="item in items"
+                    :key="item.id"
+                    class="flex items-center gap-3 px-4 py-3"
+                >
+                    <Link
+                        :href="`/stocks/${item.symbol}`"
+                        class="min-w-0 flex-1"
+                    >
                         <div class="flex items-center gap-2">
-                            <span class="font-semibold text-foreground">{{ item.symbol }}</span>
+                            <span class="font-semibold text-foreground">{{
+                                item.symbol
+                            }}</span>
                             <MarketBadge :market="item.market" />
                         </div>
-                        <p class="truncate text-xs text-muted-foreground">{{ item.name }}</p>
+                        <p class="truncate text-xs text-muted-foreground">
+                            {{ item.name }}
+                        </p>
                     </Link>
 
                     <div class="text-right">
-                        <p class="text-sm font-medium tabular-nums text-foreground">{{ formatPrice(item.price, item.currency) }}</p>
-                        <PriceChange :change="null" :change-percent="item.change_percent" :show-absolute="false" class="text-xs" />
+                        <p
+                            class="text-sm font-medium text-foreground tabular-nums"
+                        >
+                            {{ formatPrice(item.price, item.currency) }}
+                        </p>
+                        <PriceChange
+                            :change="null"
+                            :change-percent="item.change_percent"
+                            :show-absolute="false"
+                            class="text-xs"
+                        />
                     </div>
 
                     <button
                         type="button"
                         class="rounded-md p-2 transition-colors hover:bg-accent"
-                        :class="item.alerts_enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'"
-                        :title="item.alerts_enabled ? t('watchlist.alertsOn') : t('watchlist.alertsOff')"
+                        :class="
+                            item.alerts_enabled
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-muted-foreground'
+                        "
+                        :title="
+                            item.alerts_enabled
+                                ? t('watchlist.alertsOn')
+                                : t('watchlist.alertsOff')
+                        "
                         @click="toggleAlert(item)"
                     >
-                        <component :is="item.alerts_enabled ? Bell : BellOff" class="size-4" />
+                        <component
+                            :is="item.alerts_enabled ? Bell : BellOff"
+                            class="size-4"
+                        />
                     </button>
                     <button
                         type="button"

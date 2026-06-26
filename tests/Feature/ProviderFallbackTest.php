@@ -73,7 +73,8 @@ it('seeds missing API providers without reactivating disabled providers', functi
     $this->seed(ApiProviderSeeder::class);
 
     expect(ApiProvider::query()->where('key', 'synthetic')->firstOrFail()->is_active)->toBeFalse()
-        ->and(ApiProvider::query()->where('key', 'rapidapi-bist100')->exists())->toBeTrue();
+        ->and(ApiProvider::query()->where('key', 'fmp')->exists())->toBeTrue()
+        ->and(ApiProvider::query()->where('key', 'rss')->exists())->toBeTrue();
 });
 
 it('allows admins to update provider refresh settings', function () {

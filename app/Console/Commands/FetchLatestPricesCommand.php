@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
 class FetchLatestPricesCommand extends Command
 {
     protected $signature = 'tradenews:fetch-prices
-        {--market= : Limit to BIST or NASDAQ}
+        {--market= : Limit to NASDAQ}
         {--symbols= : Comma-separated symbols to fetch}
         {--limit= : Maximum number of stocks to dispatch this run}
         {--all : Dispatch every matching active stock, ignoring the provider fetch limit}

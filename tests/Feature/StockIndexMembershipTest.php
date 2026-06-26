@@ -138,8 +138,7 @@ it('filters stocks by current index membership via the scope', function () {
 
 it('maps class-share symbols to a dotted tradingview ticker', function () {
     // FMP delivers BRK.B; we normalize to BRK-B internally but TradingView wants BRK.B.
-    expect(Stock::tradingViewSymbolFor(Market::NASDAQ, 'BRK-B'))->toBe('NASDAQ:BRK.B')
-        ->and(Stock::tradingViewSymbolFor(Market::BIST, 'THYAO'))->toBe('BIST:THYAO');
+    expect(Stock::tradingViewSymbolFor(Market::NASDAQ, 'BRK-B'))->toBe('NASDAQ:BRK.B');
 
     $stock = Stock::factory()->nasdaq()->create(['symbol' => 'AAPL', 'tradingview_symbol' => null]);
     expect($stock->tradingViewSymbol())->toBe('NASDAQ:AAPL');

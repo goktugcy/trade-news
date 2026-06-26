@@ -20,7 +20,6 @@ use App\Services\News\AiSummarizer;
 use App\Services\News\AiSummarizerInterface;
 use App\Services\News\FallbackNewsProvider;
 use App\Services\News\FinnhubNewsProvider;
-use App\Services\News\KapNewsProvider;
 use App\Services\News\NewsProviderInterface;
 use App\Services\News\NullSummarizer;
 use App\Services\News\OpenAiSummarizer;
@@ -167,7 +166,6 @@ class TradeNewsServiceProvider extends ServiceProvider
                 (string) ($config['key'] ?? ''),
                 (string) ($config['base_url'] ?? 'https://finnhub.io/api/v1'),
             ),
-            'kap' => new KapNewsProvider((string) ($config['base_url'] ?? 'https://www.kap.org.tr')),
             default => new SyntheticNewsProvider,
         };
     }

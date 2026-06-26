@@ -9,18 +9,22 @@ use App\Models\Stock;
 use App\Services\News\NewsMatcherService;
 
 beforeEach(function () {
-    Stock::factory()->create([
-        'symbol' => 'THYAO',
-        'name' => 'Türk Hava Yolları',
-        'market' => Market::BIST,
-        'aliases' => ['THYAO', 'Türk Hava Yolları', 'Turkish Airlines', 'THY'],
+    Stock::factory()->nasdaq()->create([
+        'symbol' => 'AAPL',
+        'name' => 'Apple Inc.',
+        'aliases' => ['AAPL', 'Apple', 'Apple Inc.'],
     ]);
 
-    Stock::factory()->create([
-        'symbol' => 'ASELS',
-        'name' => 'Aselsan Elektronik',
-        'market' => Market::BIST,
-        'aliases' => ['ASELS', 'Aselsan', 'Aselsan Elektronik'],
+    Stock::factory()->nasdaq()->create([
+        'symbol' => 'MSFT',
+        'name' => 'Microsoft Corporation',
+        'aliases' => ['MSFT', 'Microsoft', 'Microsoft Corporation'],
+    ]);
+
+    Stock::factory()->nasdaq()->create([
+        'symbol' => 'UAL',
+        'name' => 'United Airlines Holdings',
+        'aliases' => ['UAL', 'United Airlines'],
     ]);
 });
 
@@ -35,28 +39,28 @@ function makeNews(string $title): NewsItem
 }
 
 it('matches a news item by ticker symbol', function () {
-    $news = makeNews('THYAO announces new route to Tokyo');
+    $news = makeNews('AAPL announces a new device');
 
     (new NewsMatcherService)->match($news);
 
     expect($news->fresh()->is_matched)->toBeTrue()
-        ->and($news->stocks()->pluck('symbol')->all())->toContain('THYAO');
+        ->and($news->stocks()->pluck('symbol')->all())->toContain('AAPL');
 });
 
 it('matches a news item by company name and alias', function () {
-    $news = makeNews('Turkish Airlines reports record passenger numbers');
+    $news = makeNews('Apple reports record device sales');
 
     (new NewsMatcherService)->match($news);
 
-    expect($news->stocks()->pluck('symbol')->all())->toContain('THYAO');
+    expect($news->stocks()->pluck('symbol')->all())->toContain('AAPL');
 });
 
 it('matches multiple stocks in one headline', function () {
-    $news = makeNews('Aselsan and Turkish Airlines sign a new defense logistics deal');
+    $news = makeNews('Microsoft and Apple announce a new cloud partnership');
 
     (new NewsMatcherService)->match($news);
 
-    expect($news->stocks()->pluck('symbol')->sort()->values()->all())->toEqual(['ASELS', 'THYAO']);
+    expect($news->stocks()->pluck('symbol')->sort()->values()->all())->toEqual(['AAPL', 'MSFT']);
 });
 
 it('does not match unrelated news', function () {
@@ -83,16 +87,16 @@ it('does not match company aliases inside unrelated longer words', function () {
 });
 
 it('requires short aliases to appear as exact cased standalone tokens', function () {
-    $lowercaseNews = makeNews('thy customer experience report compares global airlines');
-    $uppercaseNews = makeNews('THY reports record passenger numbers');
+    $lowercaseNews = makeNews('ual customer experience report compares global airlines');
+    $uppercaseNews = makeNews('UAL reports record passenger numbers');
     $matcher = new NewsMatcherService;
 
     $matcher->match($lowercaseNews);
     $matcher->flushIndex();
     $matcher->match($uppercaseNews);
 
-    expect($lowercaseNews->stocks()->pluck('symbol')->all())->not->toContain('THYAO')
-        ->and($uppercaseNews->stocks()->pluck('symbol')->all())->toContain('THYAO');
+    expect($lowercaseNews->stocks()->pluck('symbol')->all())->not->toContain('UAL')
+        ->and($uppercaseNews->stocks()->pluck('symbol')->all())->toContain('UAL');
 });
 
 it('does not match ticker symbols inside English contractions or possessives', function (string $headline) {
@@ -130,7 +134,7 @@ it('still matches uppercase standalone ticker symbols', function (string $headli
 ]);
 
 it('records the match type and is idempotent', function () {
-    $news = makeNews('ASELS shares climb on strong export orders');
+    $news = makeNews('MSFT shares climb on strong cloud demand');
     $matcher = new NewsMatcherService;
 
     $matcher->match($news);
@@ -141,18 +145,12 @@ it('records the match type and is idempotent', function () {
         ->and($news->matches()->first()->match_type)->toBe('symbol');
 });
 
-it('moves a BIST-labelled item to NASDAQ when only NASDAQ stocks match', function () {
-    Stock::factory()->nasdaq()->create([
-        'symbol' => 'AAPL',
-        'name' => 'Apple Inc.',
-        'aliases' => ['Apple', 'AAPL'],
-    ]);
-
+it('sets the market from the matched stock when the source market is missing', function () {
     $news = NewsItem::factory()->create([
         'title' => 'Apple shares rise after new iPhone demand report',
         'summary' => null,
         'content' => null,
-        'market' => Market::BIST,
+        'market' => null,
         'is_matched' => false,
     ]);
 
@@ -161,38 +159,32 @@ it('moves a BIST-labelled item to NASDAQ when only NASDAQ stocks match', functio
     expect($news->fresh()->market)->toBe(Market::NASDAQ);
 });
 
-it('keeps a BIST item as BIST when only BIST stocks match', function () {
+it('keeps a NASDAQ item as NASDAQ when NASDAQ stocks match', function () {
     $news = NewsItem::factory()->create([
-        'title' => 'Turkish Airlines reports record passenger numbers',
+        'title' => 'Apple reports record device sales',
         'summary' => null,
         'content' => null,
-        'market' => Market::BIST,
+        'market' => Market::NASDAQ,
         'is_matched' => false,
     ]);
 
     (new NewsMatcherService)->match($news);
 
-    expect($news->fresh()->market)->toBe(Market::BIST);
+    expect($news->fresh()->market)->toBe(Market::NASDAQ);
 });
 
-it('keeps the source market when matched stocks span multiple markets', function () {
-    Stock::factory()->nasdaq()->create([
-        'symbol' => 'AAPL',
-        'name' => 'Apple Inc.',
-        'aliases' => ['Apple', 'AAPL'],
-    ]);
-
+it('keeps the source market when multiple stocks from the same market match', function () {
     $news = NewsItem::factory()->create([
-        'title' => 'Apple and Turkish Airlines announce a new travel technology partnership',
+        'title' => 'Apple and Microsoft announce a new technology partnership',
         'summary' => null,
         'content' => null,
-        'market' => Market::BIST,
+        'market' => Market::NASDAQ,
         'is_matched' => false,
     ]);
 
     (new NewsMatcherService)->match($news);
 
-    expect($news->fresh()->market)->toBe(Market::BIST);
+    expect($news->fresh()->market)->toBe(Market::NASDAQ);
 });
 
 it('can repair market labels for already matched news items', function () {
@@ -206,7 +198,7 @@ it('can repair market labels for already matched news items', function () {
         'title' => 'Nvidia expands AI chip production',
         'summary' => null,
         'content' => null,
-        'market' => Market::BIST,
+        'market' => null,
         'is_matched' => true,
     ]);
 
@@ -216,17 +208,11 @@ it('can repair market labels for already matched news items', function () {
 });
 
 it('can repair market labels synchronously from the match command', function () {
-    Stock::factory()->nasdaq()->create([
-        'symbol' => 'MSFT',
-        'name' => 'Microsoft Corporation',
-        'aliases' => ['Microsoft', 'MSFT'],
-    ]);
-
     $news = NewsItem::factory()->create([
         'title' => 'Microsoft announces new cloud infrastructure investment',
         'summary' => null,
         'content' => null,
-        'market' => Market::BIST,
+        'market' => null,
         'is_matched' => true,
     ]);
 

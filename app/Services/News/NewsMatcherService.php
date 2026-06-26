@@ -6,41 +6,22 @@ namespace App\Services\News;
 
 use App\Enums\Market;
 use App\Models\NewsItem;
-use App\Models\Stock;
 use Illuminate\Support\Collection;
 
 /**
- * Matches a news item to the stocks it mentions, using symbol, company name,
- * aliases and keywords. For example:
- *
- *   THYAO  ⇐ "THYAO", "Türk Hava Yolları", "Turkish Airlines", "THY"
- *   ASELS  ⇐ "ASELS", "Aselsan", "Aselsan Elektronik"
+ * Tags a news item with the stocks it mentions. Matching itself is fully
+ * deterministic and delegated to StockAliasService (symbol / name / alias with
+ * confidence); this class persists news_stock_matches and resolves the item's
+ * market from the matched stocks.
  */
 class NewsMatcherService
 {
-    private const TYPE_SYMBOL = 'symbol';
+    private readonly StockAliasService $aliases;
 
-    private const TYPE_NAME = 'name';
-
-    private const TYPE_ALIAS = 'alias';
-
-    private const TYPE_KEYWORD = 'keyword';
-
-    private const CONFIDENCE = [
-        self::TYPE_SYMBOL => 1.0,
-        self::TYPE_NAME => 0.9,
-        self::TYPE_ALIAS => 0.85,
-        self::TYPE_KEYWORD => 0.6,
-    ];
-
-    private const int SHORT_ALIAS_MAX_LENGTH = 3;
-
-    /**
-     * Cached term index: list of [stockId, type, term] tuples.
-     *
-     * @var array<int, array{0: int, 1: string, 2: string, 3: string}>|null
-     */
-    private ?array $index = null;
+    public function __construct(?StockAliasService $aliases = null)
+    {
+        $this->aliases = $aliases ?? app(StockAliasService::class);
+    }
 
     /**
      * Match a single news item, persisting news_stock_matches rows.
@@ -54,35 +35,14 @@ class NewsMatcherService
             $item->summary,
             $item->content,
         ])));
-        $haystack = mb_strtolower($text);
 
-        if ($haystack === '') {
+        if ($text === '') {
             $item->forceFill(['is_matched' => true])->save();
 
             return 0;
         }
 
-        // Best match per stock (keep the highest-confidence reason).
-        $matches = [];
-
-        foreach ($this->termIndex() as [$stockId, $type, $term, $market]) {
-            $needle = mb_strtolower($term);
-
-            if (! $this->contains($text, $haystack, $term, $needle, $type)) {
-                continue;
-            }
-
-            $confidence = self::CONFIDENCE[$type];
-
-            if (! isset($matches[$stockId]) || $matches[$stockId]['confidence'] < $confidence) {
-                $matches[$stockId] = [
-                    'match_type' => $type,
-                    'matched_term' => $term,
-                    'confidence' => $confidence,
-                    'market' => $market,
-                ];
-            }
-        }
+        $matches = $this->aliases->relatedStocks($text);
 
         foreach ($matches as $stockId => $data) {
             $item->matches()->updateOrCreate(
@@ -109,76 +69,6 @@ class NewsMatcherService
     }
 
     /**
-     * Match every term as a standalone phrase. Short aliases are case-sensitive
-     * to avoid matching generic lowercase words such as "thy" or "as".
-     */
-    private function contains(string $text, string $haystack, string $term, string $needle, string $type): bool
-    {
-        if ($needle === '') {
-            return false;
-        }
-
-        if ($type === self::TYPE_SYMBOL) {
-            return $this->containsSymbol($text, $term);
-        }
-
-        if ($type !== self::TYPE_NAME && mb_strlen($needle) <= self::SHORT_ALIAS_MAX_LENGTH) {
-            return $this->containsPhrase($text, $term, ignoreCase: false);
-        }
-
-        return $this->containsPhrase($haystack, $needle, ignoreCase: true);
-    }
-
-    private function containsSymbol(string $text, string $symbol): bool
-    {
-        $pattern = '/(?<![\pL\pN])'.preg_quote($symbol, '/').'(?![\'’][sS])(?![\pL\pN])/u';
-
-        return preg_match($pattern, $text) === 1;
-    }
-
-    private function containsPhrase(string $haystack, string $needle, bool $ignoreCase): bool
-    {
-        $flags = $ignoreCase ? 'iu' : 'u';
-        $pattern = '/(?<![\pL\pN])'.preg_quote($needle, '/').'(?![\pL\pN])/'.$flags;
-
-        return preg_match($pattern, $haystack) === 1;
-    }
-
-    /**
-     * Build (and memoize) the flat term → stock index from all active stocks.
-     *
-     * @return array<int, array{0: int, 1: string, 2: string, 3: string}>
-     */
-    private function termIndex(): array
-    {
-        if ($this->index !== null) {
-            return $this->index;
-        }
-
-        $this->index = [];
-
-        Stock::query()->active()->get()->each(function (Stock $stock): void {
-            $market = $stock->market->value;
-            $this->index[] = [$stock->id, self::TYPE_SYMBOL, $stock->symbol, $market];
-            $this->index[] = [$stock->id, self::TYPE_NAME, $stock->name, $market];
-
-            foreach (($stock->aliases ?? []) as $alias) {
-                if (trim($alias) !== '' && $alias !== $stock->symbol && $alias !== $stock->name) {
-                    $this->index[] = [$stock->id, self::TYPE_ALIAS, $alias, $market];
-                }
-            }
-
-            foreach (($stock->keywords ?? []) as $keyword) {
-                if (trim($keyword) !== '') {
-                    $this->index[] = [$stock->id, self::TYPE_KEYWORD, $keyword, $market];
-                }
-            }
-        });
-
-        return $this->index;
-    }
-
-    /**
      * @param  array<int, array{match_type: string, matched_term: string, confidence: float, market: string}>  $matches
      */
     private function marketFromMatches(array $matches): ?Market
@@ -197,11 +87,11 @@ class NewsMatcherService
     }
 
     /**
-     * Allow callers (tests) to reset the memoized index after seeding stocks.
+     * Reset the memoized alias index (tests call this after seeding stocks).
      */
     public function flushIndex(): void
     {
-        $this->index = null;
+        $this->aliases->flushIndex();
     }
 
     /**

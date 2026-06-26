@@ -1,4 +1,4 @@
-export type Market = 'BIST' | 'NASDAQ';
+export type Market = 'NASDAQ';
 export type SentimentValue = 'positive' | 'neutral' | 'negative';
 
 export type StockRef = {
@@ -85,7 +85,13 @@ export type OnboardingState = {
     completed_at: string | null;
 };
 
-export type MarketSessionValue = 'open' | 'closed' | 'pre_market' | 'after_hours' | 'holiday' | 'weekend';
+export type MarketSessionValue =
+    | 'open'
+    | 'closed'
+    | 'pre_market'
+    | 'after_hours'
+    | 'holiday'
+    | 'weekend';
 
 export type MarketStatusInfo = {
     market: Market;
@@ -114,7 +120,11 @@ export type PaginatedNews = {
     };
 };
 
-export type SelectOption = { value: string | number; label: string; [key: string]: unknown };
+export type SelectOption = {
+    value: string | number;
+    label: string;
+    [key: string]: unknown;
+};
 
 export type TickerItem = {
     symbol: string;
@@ -129,7 +139,6 @@ export type NewsFeedScope = 'all' | 'watchlist' | 'saved';
 export type LiveNewsResponse = {
     items: NewsCardData[];
     updates: NewsCardData[];
-    latest_id: number;
 };
 
 export type LiveQuote = {

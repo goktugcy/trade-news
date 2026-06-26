@@ -13,11 +13,11 @@ it('produces the same fingerprint regardless of case, punctuation and word order
     expect($a)->toBe($b);
 });
 
-it('separates fingerprints by market', function () {
+it('separates fingerprints by market scope', function () {
     $n = new TitleNormalizer;
 
-    expect($n->fingerprint('Aselsan wins defense contract', 'BIST'))
-        ->not->toBe($n->fingerprint('Aselsan wins defense contract', 'NASDAQ'));
+    expect($n->fingerprint('Apple wins enterprise contract', null))
+        ->not->toBe($n->fingerprint('Apple wins enterprise contract', 'NASDAQ'));
 });
 
 it('drops stopwords so they do not affect the fingerprint', function () {

@@ -596,7 +596,6 @@ class HistoricalPriceImportService
             $symbol = $matches[1];
             $market = match ($matches[2]) {
                 'US' => Market::NASDAQ,
-                'IS', 'TR' => Market::BIST,
                 default => throw new RuntimeException("unsupported ticker suffix .{$matches[2]}"),
             };
         }
@@ -605,10 +604,7 @@ class HistoricalPriceImportService
             throw new RuntimeException('market is required when fallback market is All');
         }
 
-        $symbol = trim($symbol);
-        $symbol = $market === Market::BIST
-            ? preg_replace('/[^A-Z0-9]/', '', $symbol)
-            : preg_replace('/[^A-Z0-9.\-]/', '', $symbol);
+        $symbol = preg_replace('/[^A-Z0-9.\-]/', '', trim($symbol));
 
         if (! is_string($symbol) || $symbol === '') {
             throw new RuntimeException('TICKER symbol is invalid');

@@ -34,29 +34,6 @@ class StockSeeder extends Seeder
     private function stocks(): array
     {
         return [
-            // ---------------- BIST ----------------
-            ['market' => Market::BIST, 'symbol' => 'THYAO', 'name' => 'Türk Hava Yolları', 'sector' => 'Airlines',
-                'aliases' => ['THYAO', 'Türk Hava Yolları', 'Turkish Airlines', 'THY']],
-            ['market' => Market::BIST, 'symbol' => 'ASELS', 'name' => 'Aselsan Elektronik', 'sector' => 'Defense',
-                'aliases' => ['ASELS', 'Aselsan', 'Aselsan Elektronik']],
-            ['market' => Market::BIST, 'symbol' => 'GARAN', 'name' => 'Garanti BBVA', 'sector' => 'Banking',
-                'aliases' => ['GARAN', 'Garanti', 'Garanti Bankası', 'Garanti BBVA']],
-            ['market' => Market::BIST, 'symbol' => 'AKBNK', 'name' => 'Akbank', 'sector' => 'Banking',
-                'aliases' => ['AKBNK', 'Akbank']],
-            ['market' => Market::BIST, 'symbol' => 'BIMAS', 'name' => 'BİM Birleşik Mağazalar', 'sector' => 'Retail',
-                'aliases' => ['BIMAS', 'BİM', 'BIM', 'Birleşik Mağazalar']],
-            ['market' => Market::BIST, 'symbol' => 'EREGL', 'name' => 'Ereğli Demir Çelik', 'sector' => 'Steel',
-                'aliases' => ['EREGL', 'Erdemir', 'Ereğli', 'Eregli Demir Celik']],
-            ['market' => Market::BIST, 'symbol' => 'KCHOL', 'name' => 'Koç Holding', 'sector' => 'Conglomerate',
-                'aliases' => ['KCHOL', 'Koç Holding', 'Koc Holding']],
-            ['market' => Market::BIST, 'symbol' => 'SAHOL', 'name' => 'Sabancı Holding', 'sector' => 'Conglomerate',
-                'aliases' => ['SAHOL', 'Sabancı', 'Sabanci Holding', 'Sabancı Holding']],
-            ['market' => Market::BIST, 'symbol' => 'SISE', 'name' => 'Şişecam', 'sector' => 'Industrials',
-                'aliases' => ['SISE', 'Şişecam', 'Sisecam']],
-            ['market' => Market::BIST, 'symbol' => 'TUPRS', 'name' => 'Tüpraş', 'sector' => 'Energy',
-                'aliases' => ['TUPRS', 'Tüpraş', 'Tupras']],
-
-            // ---------------- NASDAQ ----------------
             ['market' => Market::NASDAQ, 'symbol' => 'AAPL', 'name' => 'Apple Inc.', 'sector' => 'Technology',
                 'aliases' => ['AAPL', 'Apple']],
             ['market' => Market::NASDAQ, 'symbol' => 'MSFT', 'name' => 'Microsoft Corporation', 'sector' => 'Technology',

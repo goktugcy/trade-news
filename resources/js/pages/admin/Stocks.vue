@@ -91,9 +91,11 @@ watch(search, (value) => {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
         const query: Record<string, string> = {};
+
         if (value) {
             query.q = value;
         }
+
         router.get(
             stockIndex.url({ query }),
             {},
@@ -125,7 +127,7 @@ let importQueueId = 0;
 const form = useForm({
     symbol: '',
     name: '',
-    market: 'BIST',
+    market: 'NASDAQ',
     exchange: '',
     currency: '',
     sector: '',

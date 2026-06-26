@@ -68,15 +68,11 @@ return [
                 'key' => env('FINNHUB_KEY'),
                 'base_url' => 'https://finnhub.io/api/v1',
             ],
-            'kap' => [
-                'base_url' => env('KAP_BASE_URL', 'https://www.kap.org.tr'),
-            ],
-
             /*
             | RSS / Atom feeds aggregated by RssNewsProvider. Each feed has its
             | own news_sources.key so every original source is tracked, even
             | after cross-source duplicates are merged. `market` scopes the feed
-            | (BIST = Turkish, NASDAQ = global; null also treated as global).
+            | (NASDAQ or null for global).
             | Feed URLs change over time — edit here, no code change needed.
             */
             'rss' => [
@@ -99,20 +95,6 @@ return [
                     ['key' => 'investing-com', 'name' => 'Investing.com', 'market' => null,
                         'url' => 'https://www.investing.com/rss/news.rss',
                         'homepage_url' => 'https://www.investing.com'],
-
-                    // Turkish market (BIST)
-                    ['key' => 'kap-rss', 'name' => 'KAP', 'market' => 'BIST',
-                        'url' => env('KAP_RSS_URL', ''),
-                        'homepage_url' => 'https://www.kap.org.tr'],
-                    ['key' => 'bloomberg-ht', 'name' => 'Bloomberg HT', 'market' => 'BIST',
-                        'url' => 'https://www.bloomberght.com/rss',
-                        'homepage_url' => 'https://www.bloomberght.com'],
-                    ['key' => 'foreks', 'name' => 'Foreks', 'market' => 'BIST',
-                        'url' => env('FOREKS_RSS_URL', ''),
-                        'homepage_url' => 'https://www.foreks.com'],
-                    ['key' => 'investing-tr', 'name' => 'Investing Türkiye', 'market' => 'BIST',
-                        'url' => 'https://tr.investing.com/rss/news.rss',
-                        'homepage_url' => 'https://tr.investing.com'],
                 ],
             ],
         ],
@@ -237,11 +219,6 @@ return [
             '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03',
             '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07',
             '2026-11-26', '2026-12-25',
-        ],
-        'BIST' => [
-            '2026-01-01', '2026-03-20', '2026-03-21', '2026-03-22', '2026-03-23',
-            '2026-04-23', '2026-05-01', '2026-05-19', '2026-05-27', '2026-05-28',
-            '2026-05-29', '2026-05-30', '2026-07-15', '2026-08-30', '2026-10-29',
         ],
     ],
 ];

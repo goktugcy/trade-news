@@ -9,9 +9,9 @@ it('creates a notification rule', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)->post('/alerts', [
-        'name' => 'BIST positive only',
+        'name' => 'NASDAQ positive only',
         'interval_minutes' => 15,
-        'markets' => ['BIST'],
+        'markets' => ['NASDAQ'],
         'sentiments' => ['positive'],
         'only_watchlist' => true,
         'min_importance' => 40,
@@ -22,7 +22,7 @@ it('creates a notification rule', function () {
 
     expect($rule)->not->toBeNull()
         ->and($rule->interval_minutes)->toBe(15)
-        ->and($rule->markets)->toBe(['BIST'])
+        ->and($rule->markets)->toBe(['NASDAQ'])
         ->and($rule->min_importance)->toBe(40);
 });
 

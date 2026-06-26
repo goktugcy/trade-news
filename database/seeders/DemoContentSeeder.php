@@ -69,9 +69,8 @@ class DemoContentSeeder extends Seeder
             'email' => 'demo@tradenews.test',
         ]);
 
-        // Watchlist: a handful of stocks across both markets.
         Stock::query()
-            ->whereIn('symbol', ['THYAO', 'ASELS', 'AAPL', 'NVDA', 'TSLA'])
+            ->whereIn('symbol', ['AAPL', 'MSFT', 'NVDA', 'TSLA'])
             ->get()
             ->values()
             ->each(fn (Stock $stock, int $i) => $demo->watchlist()->create([

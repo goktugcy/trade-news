@@ -53,6 +53,8 @@ export default {
         telegram: 'Telegram',
         settings: 'Ayarlar',
         admin: 'Admin',
+        logout: 'Çıkış yap',
+        language: 'Dil',
     },
     dashboard: {
         title: 'Panel',
@@ -65,7 +67,8 @@ export default {
         latestMarketNews: 'Son Piyasa Haberleri',
         viewAll: 'Tümünü gör',
         noMatchedNews: 'Henüz eşleşen haber yok',
-        noMatchedNewsDescription: 'Haber toplayıcıyı çalıştır veya demo veriyi yükle.',
+        noMatchedNewsDescription:
+            'Haber toplayıcıyı çalıştır veya demo veriyi yükle.',
         latestAlerts: 'Son Alarmlar',
         rules: 'Kurallar',
         noAlerts: 'Henüz gönderilen alarm yok.',
@@ -82,15 +85,19 @@ export default {
         newsTitle: 'Haber kaynakları',
         newsDescription: 'Kapalı kaynaklar haber akışında gizli kalır.',
         marketsTitle: 'Varsayılan piyasalar',
-        marketsDescription: 'Opsiyonel. Boş bırakırsan tüm piyasalarla başlarsın.',
+        marketsDescription:
+            'Opsiyonel. Boş bırakırsan tüm piyasalarla başlarsın.',
         tipsTitle: 'Kısa ipuçları',
         tipsDescription: 'Bunları daha sonra ayarlardan değiştirebilirsin.',
         english: 'İngilizce',
         turkish: 'Türkçe',
         allMarkets: 'Tüm piyasalar',
-        tipAlerts: 'Alarmlar sayfasından fiyat, hacim ve haber koşulları için alarm kurabilirsin.',
-        tipWatchlist: 'Haberleri ve panel kartlarını kişiselleştirmek için hisseleri takip listene ekleyebilirsin.',
-        tipSources: 'Haber sayfalarındaki Kaynaklar filtresiyle akışını düzenleyebilirsin.',
+        tipAlerts:
+            'Alarmlar sayfasından fiyat, hacim ve haber koşulları için alarm kurabilirsin.',
+        tipWatchlist:
+            'Haberleri ve panel kartlarını kişiselleştirmek için hisseleri takip listene ekleyebilirsin.',
+        tipSources:
+            'Haber sayfalarındaki Kaynaklar filtresiyle akışını düzenleyebilirsin.',
         tipAi: 'AI rozeti, aktif AI görevleriyle üretilen özetleri gösterir.',
     },
     news: {
@@ -101,17 +108,20 @@ export default {
         sourceHelp: 'Akışında görünecek kaynakları seç.',
         searchPlaceholder: 'Başlık veya sembol ara...',
         watchlistEmpty: 'Takip listen boş',
-        watchlistEmptyDescription: 'Takip ettiğin şirketlere göre haber görmek için hisse ekle.',
+        watchlistEmptyDescription:
+            'Takip ettiğin şirketlere göre haber görmek için hisse ekle.',
         browseStocks: 'Hisselere göz at',
         newer: 'Daha yeni',
         older: 'Daha eski',
         noNews: 'Henüz haber yok',
-        noNewsDescription: 'Zamanlanmış haber toplayıcıları çalışınca haberler burada görünür.',
+        noNewsDescription:
+            'Zamanlanmış haber toplayıcıları çalışınca haberler burada görünür.',
         highImpact: 'Yüksek etki',
         moreSources: '+{count} kaynak',
         newItems: '{count} yeni haber',
         noSaved: 'Henüz kayıtlı haber yok',
-        noSavedDescription: 'Sonra okumak için herhangi bir haberde yer işaretine dokun.',
+        noSavedDescription:
+            'Sonra okumak için herhangi bir haberde yer işaretine dokun.',
         browseNews: 'Haberlere göz at',
         translateTo: "Türkçe'ye çevir",
         save: 'Kaydet',
@@ -148,10 +158,12 @@ export default {
         keyDrivers: 'Ana etkenler',
         risks: 'Riskler',
         generated: 'Üretildi',
-        noAiAnalysis: 'Henüz AI analizi yok. Arka planda üretilir ve hazır olunca burada görünür.',
+        noAiAnalysis:
+            'Henüz AI analizi yok. Arka planda üretilir ve hazır olunca burada görünür.',
         relatedNews: 'İlgili haberler',
         noRelatedNews: 'Henüz ilgili haber yok',
-        noRelatedNewsDescription: 'Bu şirketten bahseden haberler eşleştikçe burada görünür.',
+        noRelatedNewsDescription:
+            'Bu şirketten bahseden haberler eşleştikçe burada görünür.',
         noPriceHistory: 'Henüz fiyat geçmişi yok.',
         closesAt: 'kapanış',
         opensAt: 'açılış',
@@ -162,15 +174,31 @@ export default {
         alsoTelegram: 'Telegram’a da gönder',
         lastTriggered: 'son tetik',
         noAlerts: 'Bu hisse için henüz alarm yok.',
+        alertType: {
+            price_above: 'Fiyat şunun üstünde',
+            price_below: 'Fiyat şunun altında',
+            percent_change: 'Günlük değişim % şunun üstünde',
+            volume_increase: 'Hacim şunun üstünde',
+            news_detected: 'Herhangi bir haber algılandı',
+            important_news: 'Önemli haber algılandı',
+        },
+        alertUnit: {
+            price_above: 'fiyat',
+            price_below: 'fiyat',
+            percent_change: '%',
+            volume_increase: 'lot',
+            important_news: 'min. önem',
+        },
         recentActivity: 'Son hareketler',
         noActivity: 'Bu hisse için henüz alarm/haber bildirimi yok.',
     },
     watchlist: {
         title: 'Takip Listesi',
         manage: 'Takip Listesini Yönet',
-        searchPlaceholder: 'Eklemek için hisse ara (örn. AAPL, Aselsan)...',
+        searchPlaceholder: 'Eklemek için hisse ara (örn. AAPL, NVIDIA)...',
         empty: 'Takip listen boş',
-        emptyDescription: 'Şirketleri takip etmeye başlamak için yukarıdan ara veya hisse listesine göz at.',
+        emptyDescription:
+            'Şirketleri takip etmeye başlamak için yukarıdan ara veya hisse listesine göz at.',
         browseStocks: 'Hisselere göz at',
         alertsOn: 'Alarmlar açık',
         alertsOff: 'Alarmlar kapalı',
@@ -179,7 +207,8 @@ export default {
     },
     alerts: {
         title: 'Alarmlar',
-        telegramWarning: 'Alarmı sohbetten de almak için Telegram bağla; uygulama içi bildirimler yine çalışır.',
+        telegramWarning:
+            'Alarmı sohbetten de almak için Telegram bağla; uygulama içi bildirimler yine çalışır.',
         connect: 'Bağlan',
         priceVolume: 'Fiyat ve hacim',
         newsRules: 'Haber kuralları',
@@ -187,14 +216,17 @@ export default {
     profile: {
         title: 'Profil ayarları',
         heading: 'Profil',
-        description: 'Adını, e-posta adresini, saat dilimini ve dilini güncelle',
+        description:
+            'Adını, e-posta adresini, saat dilimini ve dilini güncelle',
         name: 'Ad',
         fullName: 'Ad soyad',
         email: 'E-posta adresi',
         timezone: 'Saat dilimi',
-        timezoneHelp: 'Tüm haberler, piyasa saatleri, grafikler ve alarmlar bu saat dilimine göre gösterilir.',
+        timezoneHelp:
+            'Tüm haberler, piyasa saatleri, grafikler ve alarmlar bu saat dilimine göre gösterilir.',
         language: 'Dil',
-        languageHelp: 'Sabit arayüz bu dili kullanır. Dinamik haber ve analizlerde varsa cache çeviri gösterilir.',
+        languageHelp:
+            'Sabit arayüz bu dili kullanır. Dinamik haber ve analizlerde varsa cache çeviri gösterilir.',
         unverified: 'E-posta adresin doğrulanmamış.',
         resend: 'Doğrulama e-postasını tekrar göndermek için tıkla.',
         resent: 'Yeni doğrulama bağlantısı e-posta adresine gönderildi.',

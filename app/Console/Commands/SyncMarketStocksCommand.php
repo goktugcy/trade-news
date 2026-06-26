@@ -11,7 +11,6 @@ use App\Models\SyncRun;
 use App\Models\SystemJob;
 use App\Services\Providers\ApiProviderRegistry;
 use App\Services\Sync\NasdaqSyncService;
-use App\Services\Sync\RapidApiBist100SyncService;
 use Illuminate\Console\Command;
 
 class SyncMarketStocksCommand extends Command
@@ -24,9 +23,8 @@ class SyncMarketStocksCommand extends Command
     public function handle(
         ApiProviderRegistry $registry,
         NasdaqSyncService $nasdaq,
-        RapidApiBist100SyncService $bist100,
     ): int {
-        return SystemJob::track('tradenews:sync-market-stocks', function (SystemJob $job) use ($registry, $nasdaq, $bist100): int {
+        return SystemJob::track('tradenews:sync-market-stocks', function (SystemJob $job) use ($registry, $nasdaq): int {
             $providers = ApiProvider::query()
                 ->where('type', ProviderType::MarketData->value)
                 ->where('is_active', true)
@@ -54,12 +52,6 @@ class SyncMarketStocksCommand extends Command
             foreach ($providers as $provider) {
                 if ($provider->key === NasdaqSyncService::PROVIDER_KEY) {
                     $hasFailure = $this->runFmp($provider, $registry, $nasdaq, $meta) || $hasFailure;
-
-                    continue;
-                }
-
-                if ($this->isBist100Provider($provider)) {
-                    $hasFailure = $this->runBist100($provider, $registry, $bist100, $meta) || $hasFailure;
 
                     continue;
                 }
@@ -167,58 +159,6 @@ class SyncMarketStocksCommand extends Command
         return $run->status === SyncRun::STATUS_FAILED;
     }
 
-    /**
-     * @param  array{provider_keys: array<int, string>, sync_run_ids: array<int, int>, skipped: array<int, array<string, string>>}  $meta
-     */
-    private function runBist100(
-        ApiProvider $provider,
-        ApiProviderRegistry $registry,
-        RapidApiBist100SyncService $bist100,
-        array &$meta,
-    ): bool {
-        if (! $this->providerTargetsMarket($provider, Market::BIST)) {
-            $this->skip($meta, $provider, 'market_not_selected');
-
-            return false;
-        }
-
-        if (! $registry->providerHasAnyCapability($provider, ['list', 'quotes'])) {
-            $this->skip($meta, $provider, 'missing_auto_sync_capability');
-
-            return false;
-        }
-
-        $capabilities = $this->providerCapabilities($provider, ['list', 'quotes']);
-        $dueCapabilities = $this->dueCapabilities($provider, $capabilities);
-
-        if ($dueCapabilities === []) {
-            $this->skip($meta, $provider, 'not_due', implode(',', $capabilities));
-
-            return false;
-        }
-
-        foreach ($dueCapabilities as $capability) {
-            $provider->markCapabilityAttempted($capability);
-        }
-
-        if (! $this->providerHasApiKey($provider)) {
-            $this->skip($meta, $provider, 'missing_api_key', implode(',', $dueCapabilities));
-
-            return false;
-        }
-
-        $run = $bist100->sync($provider);
-        $this->recordRun($meta, $provider, $run);
-
-        if ($run->status === SyncRun::STATUS_SUCCESS) {
-            foreach ($capabilities as $capability) {
-                $provider->markCapabilityFetched($capability);
-            }
-        }
-
-        return $run->status === SyncRun::STATUS_FAILED;
-    }
-
     private function providerTargetsMarket(ApiProvider $provider, Market $market): bool
     {
         $markets = $provider->markets ?? [];
@@ -228,52 +168,6 @@ class SyncMarketStocksCommand extends Command
         }
 
         return in_array($market->value, $markets, true);
-    }
-
-    private function isBist100Provider(ApiProvider $provider): bool
-    {
-        if (in_array($provider->key, [RapidApiBist100SyncService::PROVIDER_KEY, 'rapid', 'rapidapi'], true)) {
-            return true;
-        }
-
-        return str_contains(
-            mb_strtolower((string) $provider->base_url),
-            'bist100-stock-data-15-minutes-late-live.p.rapidapi.com',
-        );
-    }
-
-    /**
-     * @param  array<int, string>  $candidates
-     * @return array<int, string>
-     */
-    private function providerCapabilities(ApiProvider $provider, array $candidates): array
-    {
-        $configured = $provider->capabilities ?? [];
-
-        if ($configured === []) {
-            return $candidates;
-        }
-
-        return array_values(array_intersect($candidates, array_map(
-            fn (mixed $capability): string => (string) $capability,
-            $configured,
-        )));
-    }
-
-    /**
-     * @param  array<int, string>  $capabilities
-     * @return array<int, string>
-     */
-    private function dueCapabilities(ApiProvider $provider, array $capabilities): array
-    {
-        if ((bool) $this->option('force')) {
-            return $capabilities;
-        }
-
-        return array_values(array_filter(
-            $capabilities,
-            fn (string $capability): bool => $provider->isDueForCapability($capability),
-        ));
     }
 
     private function isDue(ApiProvider $provider, string $capability): bool

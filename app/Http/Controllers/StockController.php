@@ -1,6 +1,6 @@
 <?php
 
-declare (strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
@@ -13,8 +13,8 @@ use App\Models\StockAlert;
 use App\Models\User;
 use App\Models\UserNotification;
 use App\Services\Ai\AiTaskService;
-use App\Services\MarketData\MarketSummaryService;
 use App\Services\Market\MarketSessionService;
+use App\Services\MarketData\MarketSummaryService;
 use App\Services\Translation\ContentTranslationService;
 use App\Support\Presenters\NewsPresenter;
 use App\Support\Presenters\StockPresenter;
@@ -31,29 +31,29 @@ class StockController extends Controller
      */
     public function index(Request $request): Response
     {
-        $market       = $this->selectedMarket($request);
-        $search       = trim($request->string('q')->toString());
+        $market = $this->selectedMarket($request);
+        $search = trim($request->string('q')->toString());
         $watchlistIds = $request->user()->watchlist()->pluck('stock_id')->all();
 
         $stocks = Stock::query()
             ->active()
             ->with('latestPrice')
             ->when(
-                in_array($market, [Market::BIST->value, Market::NASDAQ->value], true),
-                fn(Builder $q) => $q->where('market', $market),
+                $market === Market::NASDAQ->value,
+                fn (Builder $q) => $q->where('market', $market),
             )
-            ->when($search !== '', fn(Builder $q) => $q->search($search))
+            ->when($search !== '', fn (Builder $q) => $q->search($search))
             ->orderBy('symbol')
             ->get()
-            ->map(fn(Stock $stock) => StockPresenter::row($stock, [
+            ->map(fn (Stock $stock) => StockPresenter::row($stock, [
                 'in_watchlist' => in_array($stock->id, $watchlistIds, true),
             ]));
 
         return Inertia::render('stocks/Index', [
-            'stocks'  => $stocks,
+            'stocks' => $stocks,
             'filters' => [
                 'market' => $market ?: 'ALL',
-                'q'      => $search ?: null,
+                'q' => $search ?: null,
             ],
             'options' => ['markets' => Market::options()],
         ]);
@@ -70,23 +70,23 @@ class StockController extends Controller
             ->where('stock_id', $stock->id)
             ->first();
 
-        $uid               = $user->id;
+        $uid = $user->id;
         $disabledSourceIds = $user->disabledNewsSources()->pluck('news_source_id');
-        $locale            = $user->locale;
+        $locale = $user->locale;
 
         $relatedNews = $stock->news()
             ->where('is_matched', true)
-            ->whereHas('source', fn(Builder $q) => $q->where('is_active', true))
+            ->whereHas('source', fn (Builder $q) => $q->where('is_active', true))
             ->with([
                 'stocks:id,symbol,market', 'source:id,name,language', 'sources.source:id,name',
-                'translations'    => fn($q)    => $q->where('locale', $locale),
-                'reactionForUser' => fn($q) => $q->where('user_id', $uid),
-                'savedForUser'    => fn($q)    => $q->where('user_id', $uid),
+                'translations' => fn ($q) => $q->where('locale', $locale),
+                'reactionForUser' => fn ($q) => $q->where('user_id', $uid),
+                'savedForUser' => fn ($q) => $q->where('user_id', $uid),
             ])
             ->withCount(['likes', 'dislikes'])
             ->when(
                 $disabledSourceIds->isNotEmpty(),
-                fn(Builder $q) => $q->whereNotIn('source_id', $disabledSourceIds),
+                fn (Builder $q) => $q->whereNotIn('source_id', $disabledSourceIds),
             )
             ->orderByDesc('published_at')
             ->limit(20)
@@ -95,24 +95,24 @@ class StockController extends Controller
         $profile = is_array($stock->company_profile) ? $stock->company_profile : [];
 
         return Inertia::render('stocks/Show', [
-            'stock'             => [
-                 ...StockPresenter::row($stock->load('latestPrice'), [
-                    'in_watchlist'   => $watchlistEntry !== null,
+            'stock' => [
+                ...StockPresenter::row($stock->load('latestPrice'), [
+                    'in_watchlist' => $watchlistEntry !== null,
                     'alerts_enabled' => $watchlistEntry !== null && $watchlistEntry->alerts_enabled,
-                    'watchlist_id'   => $watchlistEntry?->id,
+                    'watchlist_id' => $watchlistEntry?->id,
                 ]),
-                'logo_url'    => $stock->logo_url,
+                'logo_url' => $stock->logo_url,
                 'description' => $stock->description,
-                'ceo'         => is_string($profile['ceo'] ?? null) ? $profile['ceo'] : null,
-                'index_keys'  => $stock->currentIndexKeys(),
+                'ceo' => is_string($profile['ceo'] ?? null) ? $profile['ceo'] : null,
+                'index_keys' => $stock->currentIndexKeys(),
             ],
-            'news'              => NewsPresenter::collection($relatedNews, $locale),
-            'analysis'          => $this->analysisPayload($stock, $locale),
-            'marketStatus'      => $sessions->session($stock->market, $user->timezone),
-            'stockAlerts'       => $this->stockAlertsFor($user, $stock),
-            'alertTypes'        => AlertType::options(),
+            'news' => NewsPresenter::collection($relatedNews, $locale),
+            'analysis' => $this->analysisPayload($stock, $locale),
+            'marketStatus' => $sessions->session($stock->market, $user->timezone),
+            'stockAlerts' => $this->stockAlertsFor($user, $stock),
+            'alertTypes' => AlertType::options(),
             'telegramConnected' => (bool) $user->telegramIntegration?->isActive(),
-            'recentActivity'    => $this->recentActivityFor($user, $stock),
+            'recentActivity' => $this->recentActivityFor($user, $stock),
         ]);
     }
 
@@ -127,16 +127,16 @@ class StockController extends Controller
             ->where('stock_id', $stock->id)
             ->latest('id')
             ->get()
-            ->map(fn(StockAlert $a): array=> [
-                'id'                => $a->id,
-                'stock_id'          => $a->stock_id,
-                'type'              => $a->type->value,
-                'type_label'        => $a->type->label(),
-                'threshold'         => $a->threshold,
-                'cooldown_minutes'  => $a->cooldown_minutes,
-                'is_active'         => $a->is_active,
-                'notify_in_app'     => $a->notify_in_app,
-                'notify_telegram'   => $a->notify_telegram,
+            ->map(fn (StockAlert $a): array => [
+                'id' => $a->id,
+                'stock_id' => $a->stock_id,
+                'type' => $a->type->value,
+                'type_label' => $a->type->label(),
+                'threshold' => $a->threshold,
+                'cooldown_minutes' => $a->cooldown_minutes,
+                'is_active' => $a->is_active,
+                'notify_in_app' => $a->notify_in_app,
+                'notify_telegram' => $a->notify_telegram,
                 'last_triggered_at' => $a->last_triggered_at?->toIso8601String(),
             ])
             ->all();
@@ -154,13 +154,13 @@ class StockController extends Controller
             ->latest('id')
             ->limit(8)
             ->get()
-            ->map(fn(UserNotification $n): array=> [
-                'id'         => $n->id,
-                'category'   => $n->category->value,
-                'title'      => $n->title,
-                'body'       => $n->body,
+            ->map(fn (UserNotification $n): array => [
+                'id' => $n->id,
+                'category' => $n->category->value,
+                'title' => $n->title,
+                'body' => $n->body,
                 'created_at' => $n->created_at?->toIso8601String(),
-                'read_at'    => $n->read_at?->toIso8601String(),
+                'read_at' => $n->read_at?->toIso8601String(),
             ])
             ->all();
     }
@@ -174,7 +174,7 @@ class StockController extends Controller
     private function analysisPayload(Stock $stock, string $locale): ?array
     {
         $analysis = $stock->latestAiAnalysis()
-            ->with(['translations' => fn($query) => $query->where('locale', $locale)])
+            ->with(['translations' => fn ($query) => $query->where('locale', $locale)])
             ->first();
 
         $aiEnabled = app(AiTaskService::class)->isEnabled(AiTask::StockAnalysis);
@@ -186,27 +186,27 @@ class StockController extends Controller
         $translation = $analysis->translationFor($locale);
 
         return [
-            'signal'               => $analysis->signal->value,
-            'signal_label'         => $analysis->signal->label(),
-            'signal_color'         => $analysis->signal->color(),
-            'confidence'           => $analysis->confidence,
-            'horizon'              => $analysis->horizon,
-            'estimated_price_low'  => $analysis->estimated_price_low,
+            'signal' => $analysis->signal->value,
+            'signal_label' => $analysis->signal->label(),
+            'signal_color' => $analysis->signal->color(),
+            'confidence' => $analysis->confidence,
+            'horizon' => $analysis->horizon,
+            'estimated_price_low' => $analysis->estimated_price_low,
             'estimated_price_high' => $analysis->estimated_price_high,
-            'estimated_price'      => $analysis->estimated_price,
-            'currency'             => $analysis->currency,
-            'summary'              => $translation?->summary ?: $analysis->summary,
-            'drivers'              => $translation?->drivers ?: ($analysis->drivers ?? []),
-            'risks'                => $translation?->risks ?: ($analysis->risks ?? []),
-            'disclaimer'           => $translation?->disclaimer ?: ($analysis->disclaimer ?? StockAiAnalysis::DISCLAIMER),
-            'translation_locale'   => $translation?->locale,
-            'translation_status'   => $translation !== null
+            'estimated_price' => $analysis->estimated_price,
+            'currency' => $analysis->currency,
+            'summary' => $translation?->summary ?: $analysis->summary,
+            'drivers' => $translation?->drivers ?: ($analysis->drivers ?? []),
+            'risks' => $translation?->risks ?: ($analysis->risks ?? []),
+            'disclaimer' => $translation?->disclaimer ?: ($analysis->disclaimer ?? StockAiAnalysis::DISCLAIMER),
+            'translation_locale' => $translation?->locale,
+            'translation_status' => $translation !== null
                 ? ContentTranslationService::STATUS_TRANSLATED
                 : ContentTranslationService::STATUS_ORIGINAL,
-            'can_translate'        => app(ContentTranslationService::class)->canTranslateAnalysis($analysis, $locale),
-            'generated_at'         => $analysis->generated_at?->diffForHumans(),
-            'is_stale'             => $analysis->isStale() || ! $aiEnabled,
-            'ai_enabled'           => $aiEnabled,
+            'can_translate' => app(ContentTranslationService::class)->canTranslateAnalysis($analysis, $locale),
+            'generated_at' => $analysis->generated_at?->diffForHumans(),
+            'is_stale' => $analysis->isStale() || ! $aiEnabled,
+            'ai_enabled' => $aiEnabled,
         ];
     }
 
@@ -216,7 +216,7 @@ class StockController extends Controller
      */
     public function translateAnalysis(Request $request, Stock $stock): JsonResponse
     {
-        $locale   = $request->user()->locale;
+        $locale = $request->user()->locale;
         $analysis = $stock->latestAiAnalysis()->first();
 
         if ($analysis === null) {
@@ -228,7 +228,7 @@ class StockController extends Controller
         $payload = $this->analysisPayload($stock, $locale);
 
         return response()->json([
-            'ok'       => $payload !== null && ($payload['translation_locale'] ?? null) !== null,
+            'ok' => $payload !== null && ($payload['translation_locale'] ?? null) !== null,
             'analysis' => $payload,
         ]);
     }
@@ -241,8 +241,8 @@ class StockController extends Controller
     public function liveQuotes(Request $request, MarketSummaryService $summary, MarketSessionService $sessions): JsonResponse
     {
         $symbols = collect(explode(',', $request->string('symbols')->upper()->toString()))
-            ->map(fn(string $symbol): string => trim($symbol))
-            ->filter(fn(string $symbol): bool => $symbol !== '')
+            ->map(fn (string $symbol): string => trim($symbol))
+            ->filter(fn (string $symbol): bool => $symbol !== '')
             ->unique()
             ->take(60)
             ->values();
@@ -250,27 +250,27 @@ class StockController extends Controller
         $quotes = $symbols->isEmpty()
             ? []
             : Stock::query()
-            ->active()
-            ->whereIn('symbol', $symbols)
-            ->with('latestPrice')
-            ->get()
-            ->map(function (Stock $stock): array {
-                $row = StockPresenter::row($stock);
+                ->active()
+                ->whereIn('symbol', $symbols)
+                ->with('latestPrice')
+                ->get()
+                ->map(function (Stock $stock): array {
+                    $row = StockPresenter::row($stock);
 
-                return [
-                    'symbol'         => $row['symbol'],
-                    'price'          => $row['price'],
-                    'change'         => $row['change'],
-                    'change_percent' => $row['change_percent'],
-                    'quote_at'       => $row['quote_at'],
-                ];
-            })
-            ->all();
+                    return [
+                        'symbol' => $row['symbol'],
+                        'price' => $row['price'],
+                        'change' => $row['change'],
+                        'change_percent' => $row['change_percent'],
+                        'quote_at' => $row['quote_at'],
+                    ];
+                })
+                ->all();
 
         return response()->json([
-            'quotes'        => $quotes,
-            'ticker'        => $summary->cachedTicker(),
-            'top_movers'    => $summary->cachedTopMovers(),
+            'quotes' => $quotes,
+            'ticker' => $summary->cachedTicker(),
+            'top_movers' => $summary->cachedTopMovers(),
             'market_status' => $sessions->all($request->user()->timezone),
         ]);
     }
@@ -292,10 +292,10 @@ class StockController extends Controller
             ->orderBy('symbol')
             ->limit(10)
             ->get(['id', 'symbol', 'name', 'market'])
-            ->map(fn($s) => [
-                'id'     => $s->id,
+            ->map(fn ($s) => [
+                'id' => $s->id,
                 'symbol' => $s->symbol,
-                'name'   => $s->name,
+                'name' => $s->name,
                 'market' => $s->market->value,
             ]);
 
@@ -310,12 +310,14 @@ class StockController extends Controller
             return '';
         }
 
-        if (in_array($requested, [Market::BIST->value, Market::NASDAQ->value], true)) {
+        if ($requested === Market::NASDAQ->value) {
             return $requested;
         }
 
         $preferredMarkets = $request->user()->dataPreference?->preferred_markets ?? [];
 
-        return count($preferredMarkets) === 1 ? (string) $preferredMarkets[0] : '';
+        return count($preferredMarkets) === 1 && $preferredMarkets[0] === Market::NASDAQ->value
+            ? Market::NASDAQ->value
+            : '';
     }
 }

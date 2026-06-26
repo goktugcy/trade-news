@@ -20,8 +20,8 @@ use Laminas\Feed\Reader\Reader;
 use Throwable;
 
 /**
- * Aggregates many RSS/Atom feeds (Reuters, MarketWatch, CNBC, KAP, Bloomberg HT,
- * …) into normalized NewsItemData. Each configured feed carries its own source
+ * Aggregates many RSS/Atom feeds into normalized NewsItemData. Each configured
+ * feed carries its own source
  * key + market so every origin is tracked even after cross-source merging.
  *
  * Defensive by design: a single failing or malformed feed is logged and skipped
@@ -52,16 +52,11 @@ class RssNewsProvider implements NewsProviderInterface
                 continue;
             }
 
-            // When a market is requested, only pull feeds for that market (a
-            // feed with null market is treated as global → included for NASDAQ).
+            // When a market is requested, only pull feeds for that market.
             $feedMarket = ($feed['market'] ?? null) !== null ? Market::tryFrom((string) $feed['market']) : null;
 
             if ($market !== null && $feedMarket !== null && $feedMarket !== $market) {
                 continue;
-            }
-
-            if ($market === Market::BIST && $feedMarket === null) {
-                continue; // global feeds attach to the NASDAQ/global run only
             }
 
             foreach ($this->fetchFeed($feed, $feedMarket) as $item) {
