@@ -34,10 +34,11 @@ class StockAliasService
      * @var array<string, array<int, string>>
      */
     private const array CURATED = [
-        'META' => ['Facebook'],
+        'META' => ['Facebook', 'Instagram'],
         'GOOGL' => ['Google', 'Alphabet', 'GOOG'],
         'GOOG' => ['Google', 'Alphabet', 'GOOGL'],
         'NVDA' => ['Nvidia'],
+        'AMZN' => ['Amazon', 'Amazon.com', 'AWS'],
         'TSLA' => ['Tesla Motors'],
         'BRK-B' => ['Berkshire', 'Berkshire Hathaway'],
         'AMD' => ['Advanced Micro Devices'],

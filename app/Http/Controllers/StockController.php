@@ -191,9 +191,7 @@ class StockController extends Controller
             'signal_color' => $analysis->signal->color(),
             'confidence' => $analysis->confidence,
             'horizon' => $analysis->horizon,
-            'estimated_price_low' => $analysis->estimated_price_low,
-            'estimated_price_high' => $analysis->estimated_price_high,
-            'estimated_price' => $analysis->estimated_price,
+            // Price targets are intentionally not exposed (AI Outlook, not a forecast).
             'currency' => $analysis->currency,
             'summary' => $translation?->summary ?: $analysis->summary,
             'drivers' => $translation?->drivers ?: ($analysis->drivers ?? []),

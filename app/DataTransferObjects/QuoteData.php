@@ -20,6 +20,7 @@ final readonly class QuoteData
         public float $previousClose,
         public float $volume,
         public CarbonImmutable $at,
+        public ?float $averageVolume = null,
     ) {}
 
     public function change(): float
@@ -49,6 +50,7 @@ final readonly class QuoteData
             'low' => $this->low,
             'previous_close' => $this->previousClose,
             'volume' => $this->volume,
+            'average_volume' => $this->averageVolume,
             'change' => $this->change(),
             'change_percent' => $this->changePercent(),
             'at' => $this->at->toIso8601String(),

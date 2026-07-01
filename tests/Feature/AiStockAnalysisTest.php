@@ -79,8 +79,10 @@ it('generates and stores a parsed AI stock analysis', function () {
 
     expect($analysis->signal)->toBe(StockSignal::Bullish)
         ->and($analysis->confidence)->toBe(72)
-        ->and($analysis->estimated_price)->toBe(195.0)
-        ->and($analysis->estimated_price_low)->toBe(180.5)
+        // AI Outlook never produces price targets — these stay null.
+        ->and($analysis->estimated_price)->toBeNull()
+        ->and($analysis->estimated_price_low)->toBeNull()
+        ->and($analysis->estimated_price_high)->toBeNull()
         ->and($analysis->drivers)->toBe(['Strong earnings', 'Sector tailwinds'])
         ->and($analysis->risks)->toBe(['Macro headwinds'])
         ->and($analysis->ai_model_id)->toBe($model->id)
@@ -133,7 +135,7 @@ it('does not generate analysis when the task is disabled', function () {
     Http::assertNothingSent();
 });
 
-it('renders the analysis card with disclaimer, signal and price range on the stock page', function () {
+it('renders the AI Outlook card without any price target on the stock page', function () {
     $user = User::factory()->create();
     $stock = Stock::factory()->create(['symbol' => 'MSFT', 'currency' => 'USD']);
 
@@ -160,10 +162,67 @@ it('renders the analysis card with disclaimer, signal and price range on the sto
         ->assertInertia(fn (Assert $page) => $page
             ->component('stocks/Show')
             ->where('analysis.signal', 'bullish')
+            ->where('analysis.signal_label', 'Positive')
             ->where('analysis.confidence', 65)
-            ->where('analysis.estimated_price_low', 300)
-            ->where('analysis.estimated_price_high', 340)
+            ->missing('analysis.estimated_price')
+            ->missing('analysis.estimated_price_low')
+            ->missing('analysis.estimated_price_high')
             ->where('analysis.disclaimer', StockAiAnalysis::DISCLAIMER));
+});
+
+it('maps the new outlook + opportunities keys and enriches the snapshot', function () {
+    $model = enableStockAnalysis();
+    $stock = Stock::factory()->create(['symbol' => 'NVDA', 'currency' => 'USD']);
+
+    // A daily candle history so 5-day change is computable (not faked).
+    foreach (range(0, 6) as $i) {
+        $stock->prices()->create([
+            'timeframe' => '1d',
+            'open' => 100 + $i,
+            'high' => 101 + $i,
+            'low' => 99 + $i,
+            'close' => 100 + $i,
+            'volume' => 1000,
+            'price_at' => now()->subDays($i),
+        ]);
+    }
+
+    $json = json_encode([
+        'outlook' => 'positive',
+        'confidence' => 60,
+        'horizon' => '1-3 months',
+        'summary' => 'Technical momentum is steady. Recent news sentiment stays supportive.',
+        'opportunities' => ['Datacenter demand expanding', 'Margins holding firm'],
+        'risks' => ['Valuation is rich'],
+    ]);
+
+    Http::preventStrayRequests();
+    Http::fake([
+        'analysis.hf.cloud/v1/chat/completions' => Http::response([
+            'choices' => [['message' => ['content' => (string) $json]]],
+        ], 200),
+    ]);
+
+    (new GenerateStockAnalysisJob([$stock->id]))->handle(app(StockAnalyzer::class));
+
+    $analysis = StockAiAnalysis::query()->where('stock_id', $stock->id)->firstOrFail();
+
+    expect($analysis->signal)->toBe(StockSignal::Bullish)
+        ->and($analysis->signal->label())->toBe('Positive')
+        ->and($analysis->drivers)->toBe(['Datacenter demand expanding', 'Margins holding firm'])
+        ->and($analysis->estimated_price)->toBeNull()
+        ->and($analysis->input_snapshot)->toHaveKey('market_session')
+        ->and($analysis->input_snapshot)->toHaveKey('change_percent_5d');
+
+    // The instructions forbid price targets and buy/sell language.
+    Http::assertSent(fn ($request): bool => str_contains((string) data_get($request->data(), 'messages.0.content'), '"outlook"')
+        && str_contains((string) data_get($request->data(), 'messages.0.content'), 'Do NOT give a price target'));
+});
+
+it('exposes Positive/Neutral/Negative outlook labels', function () {
+    expect(StockSignal::Bullish->label())->toBe('Positive')
+        ->and(StockSignal::Neutral->label())->toBe('Neutral')
+        ->and(StockSignal::Bearish->label())->toBe('Negative');
 });
 
 it('flags a stale analysis when it is expired', function () {

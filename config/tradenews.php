@@ -35,6 +35,11 @@ return [
     'market_data' => [
         'default' => env('MARKET_DATA_PROVIDER', 'synthetic'),
 
+        // Latest-quote source. FMP is the primary batch quote provider when an
+        // FMP key is configured (see sync.fmp.key); otherwise the synthetic
+        // generator keeps the platform working out of the box.
+        'quote_provider' => env('QUOTE_PROVIDER', env('FMP_API_KEY') ? 'fmp' : 'synthetic'),
+
         // A stock priced within this many minutes is considered "fresh" and is
         // skipped by the price fetcher, so the fetch budget goes to stocks that
         // haven't been updated yet (no provider re-fetches a fresh symbol).
@@ -50,6 +55,11 @@ return [
             'twelvedata' => [
                 'key' => env('TWELVEDATA_KEY'),
                 'base_url' => 'https://api.twelvedata.com',
+            ],
+            // FMP batch quotes: symbols per /batch-quote request. The shared FMP
+            // key / base_url live under sync.fmp (used by FmpClient).
+            'fmp' => [
+                'quote_batch' => (int) env('FMP_QUOTE_BATCH', 100),
             ],
         ],
     ],

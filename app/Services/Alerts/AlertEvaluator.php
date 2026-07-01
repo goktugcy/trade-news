@@ -84,6 +84,10 @@ class AlertEvaluator
                 ? "{$symbol} is at {$price}, below your {$threshold} alert." : null,
             AlertType::PercentChange => $changePercent !== null && abs($changePercent) >= $threshold
                 ? "{$symbol} moved {$changePercent}% today (≥ {$threshold}%)." : null,
+            AlertType::PercentUp => $changePercent !== null && $changePercent >= $threshold
+                ? "{$symbol} is up {$changePercent}% today (≥ +{$threshold}%)." : null,
+            AlertType::PercentDown => $changePercent !== null && $changePercent <= -$threshold
+                ? "{$symbol} is down {$changePercent}% today (≤ -{$threshold}%)." : null,
             AlertType::VolumeIncrease => $volume !== null && $volume >= $threshold
                 ? "{$symbol} volume is {$volume} (≥ {$threshold})." : null,
             default => null,
@@ -157,6 +161,9 @@ class AlertEvaluator
             );
         }
 
-        $alert->forceFill(['last_triggered_at' => $now])->save();
+        $alert->forceFill([
+            'last_triggered_at' => $now,
+            'trigger_count' => $alert->trigger_count + 1,
+        ])->save();
     }
 }

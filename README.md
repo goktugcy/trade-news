@@ -1,8 +1,10 @@
 # TradeNews
 
 A SaaS-style **market news & stock tracking** platform, built as a clean **modular Laravel monolith**.
-Track NASDAQ stocks, view current/historical prices with charts, follow market and
-company-specific news, build watchlists, and receive **Telegram alerts** on your chosen schedule.
+It tracks **NASDAQ-100 and S&P 500** stocks with news aggregation, AI summaries, FinBERT sentiment,
+an **AI Outlook** (positive/neutral/negative — not buy/sell), watchlists, stock detail pages with
+**TradingView charts**, latest quotes, alerts, **in-app notifications** and optional **Telegram
+notifications**, plus an admin section for provider/sync monitoring.
 
 The interface is a modern financial terminal crossed with a clean social feed: left sidebar
 navigation, a central news feed, and a right-hand market summary / watchlist rail, with full
@@ -20,7 +22,8 @@ light/dark mode.
 | Scheduler | Laravel Scheduler (`schedule:work`) |
 | Frontend | Inertia.js + Vue 3 + TypeScript |
 | Styling | Tailwind CSS v4 (shadcn-vue / reka-ui components) |
-| Charts | [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts) |
+| Charts | TradingView embed widget (data + charting; no internal OHLCV sync by default) |
+| Market data | FMP batch quotes (NASDAQ-100 + S&P 500 universe, profiles, latest quotes); Finnhub/TwelveData optional |
 | News feeds | RSS/Atom via `laminas/laminas-feed` (5 sources) + Finnhub |
 | AI summaries | OpenAI (optional, via Laravel's HTTP client — no SDK; graceful no-key fallback) |
 | Auth | Laravel Fortify (incl. 2FA + passkeys from the starter kit) |
@@ -46,7 +49,7 @@ light/dark mode.
 > already-stored data based on watchlists + rules.
 
 ```
-                ┌──────────────── Laravel Scheduler (every 5 min) ─────────────────┐
+                ┌──────────────── Laravel Scheduler (every minute) ────────────────┐
                 │                                                                  │
    tradenews:fetch-prices        tradenews:fetch-news        tradenews:dispatch-notifications
                 │                          │                                 │
@@ -72,23 +75,33 @@ Services/
   MarketData/
     MarketDataProviderInterface.php     # contract: getQuote(), getCandles()
     SyntheticMarketDataProvider.php     # default — realistic data, no API key
-    FinnhubProvider.php                 # real example integration
-    TwelveDataProvider.php              # real example integration
-    MarketDataIngestor.php              # central fetch → upsert candles → cache quote
+    FmpQuoteProvider.php                # FMP quote mapper (primary quote source)
+    FmpQuoteSyncService.php             # batch quote sync for index members only
+    FinnhubProvider.php / TwelveDataProvider.php  # optional integrations
+    MarketDataIngestor.php              # central fetch → cache quote (+ candles if enabled)
     MarketSummaryService.php            # cached top movers
+  Sync/
+    FmpClient.php                       # FMP HTTP client: stock-list, profile, batch-quote
+    NasdaqSyncService.php               # NASDAQ-100 + S&P 500 universe + profile sync
   News/
-    NewsProviderInterface.php           # contract: fetchLatest()
-    SyntheticNewsProvider.php           # default — generates matchable headlines
-    FinnhubNewsProvider.php             # real example integration
     NewsIngestor.php                    # dedupe (hash) → store
-    NewsMatcherService.php              # match news → stocks (symbol/name/alias/keyword)
-    SentimentAnalyzer.php               # lexicon sentiment + importance scoring
+    StockAliasService.php               # deterministic alias index + text → stock matching
+    NewsMatcherService.php              # match news → stocks via the alias index
+    NewsSentimentService.php            # FinBERT sentiment (lexicon fallback) on English text
+  Ai/
+    StockAnalyzer.php                   # AI Outlook (positive/neutral/negative, no price target)
+  Alerts/
+    AlertEvaluator.php                  # price/%-change/volume/news alerts + cooldown
   Telegram/
     TelegramBotService.php              # sendMessage / setWebhook / format alert
-    TelegramConnectionService.php       # connection-code → chat_id linking
   Notification/
+    NotificationCenter.php              # toUser / toAdmins (in-app + optional Telegram)
     NotificationDispatcher.php          # per-user filtering + queueing of alerts
 ```
+
+> **News pipeline order:** financial analysis runs on the **original English** text *before*
+> translation — ingest → dedupe → alias matching → FinBERT sentiment → AI summary/outlook →
+> importance → (on-demand) Turkish translation. Translation never precedes sentiment/analysis.
 
 Providers are bound to their interface in `App\Providers\TradeNewsServiceProvider` based on
 `config/tradenews.php` (driven by `.env`). Swapping `MARKET_DATA_PROVIDER=finnhub` is all it
@@ -100,7 +113,12 @@ takes to switch data sources — no other code changes.
 `telegram_integrations`, `notification_rules`, `app_notifications` (delivery log), `api_providers`,
 `system_jobs` (scheduled-run heartbeat), plus Laravel's `jobs` / `failed_jobs`.
 
-Enums (`app/Enums`): `Market`, `NotificationInterval`, `Sentiment`, `ProviderStatus`,
+Plus `stock_aliases` (deterministic matching index), `stock_alerts` (with `trigger_count`),
+`stock_ai_analyses`, `stock_index_memberships` (nasdaq100 / sp500), `user_notifications`,
+`provider_events` and `sync_runs`.
+
+Enums (`app/Enums`): `Market`, `MarketSession`, `StockIndex`, `AlertType`, `Sentiment`,
+`StockSignal` (AI Outlook), `NotificationCategory`, `NotificationInterval`, `ProviderStatus`,
 `ProviderType`, `Timeframe`. DTOs (`app/DataTransferObjects`): `QuoteData`, `CandleData`,
 `NewsItemData`.
 
@@ -177,6 +195,13 @@ NEWS_PROVIDER=synthetic              # synthetic | finnhub
 FINNHUB_KEY=
 TWELVEDATA_KEY=
 
+# Quotes: defaults to "fmp" when FMP_API_KEY is set, else "synthetic".
+QUOTE_PROVIDER=
+FMP_API_KEY=                         # NASDAQ-100 + S&P 500 universe, profiles, batch quotes
+FMP_QUOTE_BATCH=100                  # symbols per /batch-quote request
+# Charts come from TradingView; internal historical OHLCV sync stays off by default.
+STOCK_HISTORICAL_OHLCV_ENABLED=false
+
 # AI summaries (optional — no key = falls back to the article's own summary)
 AI_PROVIDER=openai
 OPENAI_API_KEY=
@@ -219,18 +244,25 @@ in the `api_providers` table (admin panel).
   cadence) + a dedicated `/notifications` page with read/unread, categories and filtering. Backed by
   `user_notifications` and `App\Services\Notification\NotificationCenter` (`toUser` / `toAdmins`),
   which can also fan a message to Telegram.
-- **Custom alerts** — `/alerts` has a second tab for condition alerts: price above/below, %-change,
-  volume, news-detected, important-news, each with a cooldown and in-app + optional Telegram
-  delivery. `tradenews:evaluate-alerts` (every minute) runs `AlertEvaluator` against the latest
-  cached quote / matched news.
+- **Custom alerts** — `/alerts` has a second tab for condition alerts: price above/below,
+  daily %-change (absolute), daily gain/drop % over a threshold, volume, news-detected and
+  important-news, each with a cooldown, a `trigger_count`, and in-app + optional Telegram delivery.
+  `tradenews:evaluate-alerts` (every minute) runs `AlertEvaluator` against the latest cached quote /
+  matched news.
 - **Provider state machine** — `ProviderHealthService` moves each provider Operational → Degraded →
   Down → (auto-recovers) based on the health probe's success/failure, supports manual Disabled, and
   logs every transition to `provider_events` + notifies admins. Admins get full CRUD over providers
   (markets, capabilities, priority, refresh, auto-recovery) at `/admin/providers`.
-- **FMP NASDAQ sync (optional)** — with `FMP_API_KEY`, `tradenews:sync-nasdaq` (weekly) refreshes
-  the NASDAQ universe and `tradenews:sync-profiles` (daily) fills sector/industry/market-cap/profile
-  via Financial Modeling Prep; runs are tracked in `sync_runs`. Without a key it falls back to the
-  Finnhub-based `tradenews:sync-nasdaq-stocks`. Quotes/candles stay on Finnhub/TwelveData.
+- **FMP market data (primary)** — with `FMP_API_KEY`, Financial Modeling Prep supplies the
+  **NASDAQ-100 + S&P 500 universe, company profiles, and latest quotes**. `tradenews:sync-quotes`
+  batch-fetches quotes for index members only (one request per chunk — never the full NASDAQ),
+  caches them in Redis and persists them locally; `tradenews:sync-market-stocks` keeps the universe
+  and profiles fresh. Runs are tracked in `sync_runs` and provider health. Without a key it falls
+  back to synthetic quotes (and the Finnhub-based universe sync).
+- **AI Outlook** — `StockAnalyzer` produces a neutral positive/neutral/negative outlook with
+  confidence, opportunities, risks and a disclaimer from backend-only context (quote, multi-day
+  change when daily candles exist, volume, news importance, watchlist interest, market session).
+  It never emits a price target or buy/sell language.
 - **Admin monitoring** — `/admin/provider-events`, `/admin/sync-logs` (last success/failure per
   sync type) and `/admin/system-notifications` (provider/sync/system events sent to admins).
 
@@ -242,21 +274,59 @@ Registered in `routes/console.php` (run with `php artisan schedule:work`):
 
 | Command | Cadence | Purpose |
 | --- | --- | --- |
-| `tradenews:fetch-prices` | every 5 min | dispatch a price-fetch job per active stock |
-| `tradenews:fetch-news` | every 5 min | fan out per active provider; fetch + merge news, chain sentiment + matching + AI summary |
+| `tradenews:sync-quotes` | every min | FMP batch quotes for NASDAQ-100 + S&P 500 members (when `QUOTE_PROVIDER=fmp`) |
+| `tradenews:fetch-prices` | every min | per-stock price fetch (non-FMP quote source, or when historical OHLCV is enabled) |
+| `tradenews:fetch-news` | every min | fan out per active provider; fetch + merge news, chain sentiment + matching + AI summary |
+| `tradenews:warm-market-summary` | every min | warm the ticker + top-movers cache |
 | `tradenews:match-news` | every 10 min | safety-net match sweep for unmatched items |
 | `tradenews:dispatch-notifications` | every 5 min | queue Telegram alerts for news rules due this minute (per-user tz) |
 | `tradenews:evaluate-alerts` | every min | evaluate custom price/volume/news alerts → in-app + Telegram |
-| `tradenews:check-providers` | every 30 min | probe providers → status state machine + events |
-| `tradenews:sync-nasdaq` | weekly | FMP NASDAQ universe sync (fallback: Finnhub) |
-| `tradenews:sync-profiles` | daily 02:30 | FMP company profiles/metadata |
+| `tradenews:check-providers` | every 5 min | probe providers → status state machine + events |
+| `tradenews:sync-market-stocks` | every min | NASDAQ-100 + S&P 500 universe + profile sync (capability-timed) |
+| `tradenews:generate-stock-analyses` | hourly + daily 04:00 | AI Outlook for watchlist/important-news stocks (hourly) and all stocks (daily) |
 | `tradenews:cleanup` | daily 03:30 | prune old prices/news/notifications + dedupe |
 
-Run any once manually, e.g. `php artisan tradenews:fetch-news`.
+Each command is checked on its cadence but only does work when due (provider refresh intervals /
+freshness windows decide the rest). Run any once manually, e.g. `php artisan tradenews:fetch-news`.
+
+> **Maintenance command:** `tradenews:rebuild-stock-aliases` rebuilds the deterministic
+> `stock_aliases` matching index for every stock (run after a deploy that changes alias rules).
 
 Notification cadence: the dispatcher runs every 5 minutes and itself decides which user rules
 (5m / 15m / 30m / 1h / 3h / 5h / 1d) are *due* based on the minute-of-day **in each user's
 timezone**, then sends only news the user hasn't already been alerted about.
+
+---
+
+## Deployment checklist
+
+After pulling a new release:
+
+1. **Migrate the database** — `php artisan migrate` (never `migrate:fresh` in dev/prod).
+2. **Seed/refresh providers** — `php artisan db:seed --class=ApiProviderSeeder` (idempotent).
+3. **Rebuild stock aliases** — `php artisan tradenews:rebuild-stock-aliases` so every stock gets
+   the latest deterministic alias index.
+4. **Seed / sync the universe** — `php artisan tradenews:sync-market-stocks --force` to populate
+   NASDAQ-100 + S&P 500 members and profiles (requires `FMP_API_KEY`).
+5. **Verify FMP quotes** — `php artisan tradenews:sync-quotes --now` and confirm `/admin/market-data`
+   shows the `fmp` provider healthy with quote counts.
+6. **Verify RSS news** — `php artisan tradenews:fetch-news` and check `/admin/news-sources`.
+7. **Verify the queue worker** — `php artisan queue:work` (jobs are processed, not stuck).
+8. **Verify the scheduler** — `php artisan schedule:work` (or a cron calling `schedule:run`).
+9. **Verify Telegram** — set the webhook (below) and run the connect flow.
+10. **Verify notifications** — trigger an alert and confirm an in-app notification (and Telegram if
+    enabled) is created.
+
+### Useful commands
+
+```bash
+php artisan tradenews:rebuild-stock-aliases     # rebuild the alias matching index
+php artisan tradenews:sync-market-stocks --force # sync NASDAQ-100 + S&P 500 universe + profiles
+php artisan tradenews:sync-quotes --now          # batch-sync FMP quotes for index members
+php artisan tradenews:check-providers            # run provider health probes now
+php artisan queue:work                           # process queued jobs
+php artisan schedule:work                        # run the scheduler
+```
 
 ---
 

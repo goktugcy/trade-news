@@ -94,6 +94,34 @@ class FmpClient
     }
 
     /**
+     * Latest quotes for many symbols in a single request (FMP "batch quote").
+     * Keeps the request small enough to stay within rate limits — the caller
+     * chunks the universe. Returns the raw FMP quote rows keyed numerically.
+     *
+     * @param  array<int, string>  $symbols
+     * @return array<int, array<string, mixed>>
+     */
+    public function batchQuote(array $symbols): array
+    {
+        $symbols = array_values(array_filter(array_map(
+            fn (mixed $s): string => mb_strtoupper(trim((string) $s)),
+            $symbols,
+        ), fn (string $s): bool => $s !== ''));
+
+        if ($symbols === []) {
+            return [];
+        }
+
+        $rows = $this->get('/batch-quote', ['symbols' => implode(',', $symbols)], timeout: 30);
+
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        return array_values(array_filter($rows, 'is_array'));
+    }
+
+    /**
      * Company profile for a symbol, or null if FMP has none.
      *
      * @return array<string, mixed>|null

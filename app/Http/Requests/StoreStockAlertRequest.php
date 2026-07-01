@@ -20,12 +20,10 @@ class StoreStockAlertRequest extends FormRequest
      */
     public function rules(): array
     {
-        $thresholdTypes = [
-            AlertType::PriceAbove->value,
-            AlertType::PriceBelow->value,
-            AlertType::PercentChange->value,
-            AlertType::VolumeIncrease->value,
-        ];
+        $thresholdTypes = array_values(array_filter(
+            array_column(AlertType::cases(), 'value'),
+            fn (string $value): bool => AlertType::from($value)->needsThreshold(),
+        ));
 
         return [
             'stock_id' => ['required', 'integer', 'exists:stocks,id'],

@@ -71,6 +71,48 @@ it('fires percent-change and volume alerts', function () {
     expect(app(AlertEvaluator::class)->evaluateAll())->toBe(2);
 });
 
+it('fires a daily-gain alert only on an upward move', function () {
+    $user = User::factory()->create();
+    $up = Stock::factory()->create(['symbol' => 'UP']);
+    $down = Stock::factory()->create(['symbol' => 'DN']);
+    cacheQuote($up, price: 100, changePercent: 6.0);
+    cacheQuote($down, price: 100, changePercent: -6.0);
+
+    StockAlert::factory()->for($user)->for($up)->type(AlertType::PercentUp, 5)->create();
+    StockAlert::factory()->for($user)->for($down)->type(AlertType::PercentUp, 5)->create();
+
+    // Only the +6% stock fires; the -6% stock does not.
+    expect(app(AlertEvaluator::class)->evaluateAll())->toBe(1);
+});
+
+it('fires a daily-drop alert only on a downward move', function () {
+    $user = User::factory()->create();
+    $down = Stock::factory()->create(['symbol' => 'DN']);
+    $up = Stock::factory()->create(['symbol' => 'UP']);
+    cacheQuote($down, price: 100, changePercent: -6.0);
+    cacheQuote($up, price: 100, changePercent: 6.0);
+
+    StockAlert::factory()->for($user)->for($down)->type(AlertType::PercentDown, 5)->create();
+    StockAlert::factory()->for($user)->for($up)->type(AlertType::PercentDown, 5)->create();
+
+    expect(app(AlertEvaluator::class)->evaluateAll())->toBe(1);
+});
+
+it('increments the trigger count each time an alert fires', function () {
+    $user = User::factory()->create();
+    $stock = Stock::factory()->create(['symbol' => 'AAPL']);
+    cacheQuote($stock, price: 210);
+    $alert = StockAlert::factory()->for($user)->for($stock)->type(AlertType::PriceAbove, 200)->create([
+        'cooldown_minutes' => 0,
+    ]);
+
+    app(AlertEvaluator::class)->evaluateAll();
+    app(AlertEvaluator::class)->evaluateAll();
+
+    expect($alert->fresh()->trigger_count)->toBe(2)
+        ->and($alert->fresh()->last_triggered_at)->not->toBeNull();
+});
+
 it('fires a news-detected alert for newly matched news', function () {
     $user = User::factory()->create();
     $stock = Stock::factory()->create();

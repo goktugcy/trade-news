@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property bool $is_active
  * @property int $cooldown_minutes
  * @property Carbon|null $last_triggered_at
+ * @property int $trigger_count
  * @property bool $notify_in_app
  * @property bool $notify_telegram
  */
@@ -31,7 +32,7 @@ class StockAlert extends Model
 
     protected $fillable = [
         'user_id', 'stock_id', 'type', 'threshold', 'is_active',
-        'cooldown_minutes', 'last_triggered_at', 'notify_in_app', 'notify_telegram',
+        'cooldown_minutes', 'last_triggered_at', 'trigger_count', 'notify_in_app', 'notify_telegram',
     ];
 
     protected function casts(): array
@@ -42,6 +43,7 @@ class StockAlert extends Model
             'is_active' => 'boolean',
             'cooldown_minutes' => 'integer',
             'last_triggered_at' => 'datetime',
+            'trigger_count' => 'integer',
             'notify_in_app' => 'boolean',
             'notify_telegram' => 'boolean',
         ];

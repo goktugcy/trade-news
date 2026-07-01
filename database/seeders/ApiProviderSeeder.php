@@ -26,7 +26,7 @@ class ApiProviderSeeder extends Seeder
                 'markets' => ['NASDAQ'], 'capabilities' => ['quotes', 'candles'], 'auto_sync_stocks' => false],
             ['key' => 'fmp', 'name' => 'Financial Modeling Prep', 'type' => ProviderType::MarketData,
                 'base_url' => 'https://financialmodelingprep.com/stable', 'priority' => 40, 'status' => ProviderStatus::Unknown, 'refresh_interval_minutes' => 1440, 'fetch_limit' => 50,
-                'markets' => ['NASDAQ'], 'capabilities' => ['list', 'profiles'], 'auto_sync_stocks' => true],
+                'markets' => ['NASDAQ'], 'capabilities' => ['list', 'profiles', 'quotes'], 'auto_sync_stocks' => true],
             ['key' => 'synthetic-news', 'name' => 'Synthetic News Wire', 'type' => ProviderType::News,
                 'base_url' => null, 'priority' => 10, 'status' => ProviderStatus::Operational, 'refresh_interval_minutes' => 5, 'fetch_limit' => 50,
                 'markets' => null, 'capabilities' => ['news'], 'auto_sync_stocks' => false],

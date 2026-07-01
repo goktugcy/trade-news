@@ -63,6 +63,23 @@ it('links curated brand aliases such as Facebook to META', function () {
         ->and(reset($matches)['match_type'])->toBe('alias');
 });
 
+it('links expanded curated aliases (Instagram → META, AWS/Amazon → AMZN)', function () {
+    Stock::factory()->nasdaq()->create(['symbol' => 'META', 'name' => 'Meta Platforms Inc.', 'aliases' => []]);
+    Stock::factory()->nasdaq()->create(['symbol' => 'AMZN', 'name' => 'Amazon.com, Inc.', 'aliases' => []]);
+
+    $instagram = aliasService()->relatedStocks('Instagram launches a new feature');
+    $amazon = aliasService()->relatedStocks('Amazon reports record holiday sales');
+    $aws = aliasService()->relatedStocks('Outage hits AWS cloud customers');
+
+    expect($instagram)->toHaveCount(1)
+        ->and(reset($instagram)['match_type'])->toBe('alias')
+        ->and($amazon)->toHaveCount(1)
+        ->and($aws)->toHaveCount(1);
+
+    // The short curated alias is case-sensitive — lowercase "aws" must not match.
+    expect(aliasService()->relatedStocks('he saws wood all day'))->toBe([]);
+});
+
 it('does not match aliases inside unrelated longer words', function () {
     Stock::factory()->nasdaq()->create(['symbol' => 'META', 'name' => 'Meta Platforms Inc.', 'aliases' => ['Meta']]);
 

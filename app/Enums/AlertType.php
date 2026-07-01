@@ -9,6 +9,8 @@ enum AlertType: string
     case PriceAbove = 'price_above';
     case PriceBelow = 'price_below';
     case PercentChange = 'percent_change';
+    case PercentUp = 'percent_up';
+    case PercentDown = 'percent_down';
     case VolumeIncrease = 'volume_increase';
     case NewsDetected = 'news_detected';
     case ImportantNews = 'important_news';
@@ -19,6 +21,8 @@ enum AlertType: string
             self::PriceAbove => 'Price above',
             self::PriceBelow => 'Price below',
             self::PercentChange => 'Daily change % over',
+            self::PercentUp => 'Daily gain % over',
+            self::PercentDown => 'Daily drop % over',
             self::VolumeIncrease => 'Volume above',
             self::NewsDetected => 'Any news detected',
             self::ImportantNews => 'Important news detected',
@@ -41,7 +45,7 @@ enum AlertType: string
      */
     public function isPriceType(): bool
     {
-        return in_array($this, [self::PriceAbove, self::PriceBelow, self::PercentChange, self::VolumeIncrease], true);
+        return in_array($this, [self::PriceAbove, self::PriceBelow, self::PercentChange, self::PercentUp, self::PercentDown, self::VolumeIncrease], true);
     }
 
     public function isNewsType(): bool
@@ -56,7 +60,7 @@ enum AlertType: string
     {
         return match ($this) {
             self::PriceAbove, self::PriceBelow => 'price',
-            self::PercentChange => '%',
+            self::PercentChange, self::PercentUp, self::PercentDown => '%',
             self::VolumeIncrease => 'shares',
             self::ImportantNews => 'min importance',
             self::NewsDetected => null,

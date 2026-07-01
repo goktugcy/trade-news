@@ -12,7 +12,7 @@ import TypewriterText from '@/components/tradenews/TypewriterText.vue';
 import { Button } from '@/components/ui/button';
 import { useLiveQuotes } from '@/composables/useLiveQuotes';
 import { useUserTimezone } from '@/composables/useUserTimezone';
-import { formatNumber, formatPrice } from '@/lib/format';
+import { formatNumber } from '@/lib/format';
 import { postJson } from '@/lib/http';
 import type { MarketSessionValue, NewsCardData, StockRow } from '@/types';
 
@@ -59,9 +59,6 @@ type AiStockAnalysis = {
     signal_color: string;
     confidence: number;
     horizon: string | null;
-    estimated_price_low: number | null;
-    estimated_price_high: number | null;
-    estimated_price: number | null;
     currency: string | null;
     summary: string | null;
     drivers: string[];
@@ -326,21 +323,8 @@ function toggleAlert() {
                 </p>
 
                 <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div v-if="analysisLocal.estimated_price !== null || analysisLocal.estimated_price_low !== null" class="rounded-lg border border-sidebar-border/70 p-3 text-sm dark:border-sidebar-border">
-                        <p class="text-xs text-muted-foreground">{{ t('stocks.estimatedPrice') }}{{ analysisLocal.horizon ? ` · ${analysisLocal.horizon}` : '' }}</p>
-                        <p class="mt-1 font-semibold tabular-nums text-foreground">
-                            <template v-if="analysisLocal.estimated_price_low !== null && analysisLocal.estimated_price_high !== null">
-                                {{ formatPrice(analysisLocal.estimated_price_low, analysisLocal.currency ?? stock.currency) }}
-                                – {{ formatPrice(analysisLocal.estimated_price_high, analysisLocal.currency ?? stock.currency) }}
-                            </template>
-                            <template v-else-if="analysisLocal.estimated_price !== null">
-                                {{ formatPrice(analysisLocal.estimated_price, analysisLocal.currency ?? stock.currency) }}
-                            </template>
-                        </p>
-                    </div>
-
                     <div v-if="analysisLocal.drivers.length" class="rounded-lg border border-sidebar-border/70 p-3 text-sm dark:border-sidebar-border">
-                        <p class="text-xs text-muted-foreground">{{ t('stocks.keyDrivers') }}</p>
+                        <p class="text-xs text-muted-foreground">{{ t('stocks.opportunities') }}</p>
                         <ul class="mt-1 list-disc space-y-0.5 pl-4 text-foreground">
                             <li v-for="(driver, i) in analysisLocal.drivers" :key="i">{{ driver }}</li>
                         </ul>

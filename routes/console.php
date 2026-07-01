@@ -30,10 +30,23 @@ Artisan::command('tradenews:telegram-set-webhook {url?}', function (TelegramBotS
 */
 
 // Prices: checked every minute; provider refresh intervals decide when work is due.
-Schedule::command('tradenews:fetch-prices --random')
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->onOneServer();
+// Quotes: FMP is the primary batch quote provider (one request per chunk for
+// index members only). The per-stock fetcher still runs for non-FMP quote
+// sources, or when internal historical OHLCV candles are enabled.
+if (config('tradenews.market_data.quote_provider') === 'fmp') {
+    Schedule::command('tradenews:sync-quotes')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->onOneServer();
+}
+
+if (config('tradenews.market_data.quote_provider') !== 'fmp'
+    || config('tradenews.chart.historical_ohlcv_enabled')) {
+    Schedule::command('tradenews:fetch-prices --random')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->onOneServer();
+}
 
 // News: checked every minute; provider refresh intervals decide when work is due.
 Schedule::command('tradenews:fetch-news')

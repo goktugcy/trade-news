@@ -35,8 +35,13 @@ class MarketDataIngestor
      */
     public function sync(Stock $stock): void
     {
-        foreach (self::SYNC_TIMEFRAMES as $timeframe) {
-            $this->ingestCandles($stock, $timeframe);
+        // Charts come from TradingView, so historical OHLCV candles are only
+        // fetched when explicitly enabled. The quote-derived candle below still
+        // runs so Stock::latestPrice (and the live quote) keep working.
+        if (config('tradenews.chart.historical_ohlcv_enabled')) {
+            foreach (self::SYNC_TIMEFRAMES as $timeframe) {
+                $this->ingestCandles($stock, $timeframe);
+            }
         }
 
         $quote = $this->provider->getQuote($stock);

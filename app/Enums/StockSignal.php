@@ -10,9 +10,18 @@ enum StockSignal: string
     case Neutral = 'neutral';
     case Bearish = 'bearish';
 
+    /**
+     * User-facing AI Outlook label. Stored values stay bullish/neutral/bearish
+     * for backward compatibility, but we present a neutral Positive/Neutral/Negative
+     * outlook rather than buy/sell-flavoured signal wording.
+     */
     public function label(): string
     {
-        return ucfirst($this->value);
+        return match ($this) {
+            self::Bullish => 'Positive',
+            self::Neutral => 'Neutral',
+            self::Bearish => 'Negative',
+        };
     }
 
     public function color(): string
