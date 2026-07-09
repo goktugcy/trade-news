@@ -10,6 +10,8 @@ The interface is a modern financial terminal crossed with a clean social feed: l
 navigation, a central news feed, and a right-hand market summary / watchlist rail, with full
 light/dark mode.
 
+![TradeNews dashboard](public/ss.png)
+
 ---
 
 ## Tech stack
